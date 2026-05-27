@@ -528,7 +528,8 @@ export default function App() {
     try {
       // If it's PIX, create payment on Mercado Pago
       if (paymentMethod === 'pix') {
-        const response = await fetch('/api/create-pix', {
+        const baseUrl = import.meta.env.VITE_API_URL || '';
+        const response = await fetch(`${baseUrl}/api/create-pix`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -548,14 +549,31 @@ export default function App() {
         });
 
         if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || 'Falha ao gerar o pagamento via Pix. Tente outro método ou revise seus dados.');
+          const contentType = response.headers.get('content-type');
+          let errorMessage = 'Falha ao gerar o pagamento via Pix. Tente outro método ou revise seus dados.';
+          
+          if (contentType && contentType.includes('application/json')) {
+            const errorData = await response.json().catch(() => ({}));
+            errorMessage = errorData.error || errorMessage;
+          } else {
+            const text = await response.text();
+            console.error('Server returned non-JSON error:', text);
+            if (response.status === 404) errorMessage = 'Serviço de pagamentos não encontrado. Por favor, contate o suporte.';
+            else if (response.status >= 500) errorMessage = 'O servidor de pagamentos encontrou um erro. Tente novamente em instantes.';
+          }
+          
+          throw new Error(errorMessage);
         }
 
         const mpData = await response.json();
         
         // ONLY write to Firestore if PIX was successfully generated
-        await setDoc(doc(db, 'orders', generatedOrderId), newOrder);
+        // Enrich order with Mercado Pago ID
+        const orderWithMP = {
+          ...newOrder,
+          mercadoPagoId: mpData.id?.toString()
+        };
+        await setDoc(doc(db, 'orders', generatedOrderId), orderWithMP);
 
         setPixPaymentData({
           orderId: generatedOrderId,

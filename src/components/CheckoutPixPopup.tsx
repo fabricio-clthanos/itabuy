@@ -19,8 +19,9 @@ export default function CheckoutPixPopup({ orderId, total, pixData, onSuccess, o
   const [copied, setCopied] = useState(false);
   const [status, setStatus] = useState<'pending' | 'confirmed'>('pending');
 
-  // Monitor order status in Firestore
+  // Monitor order status in Firestore and poll backend as fallback
   useEffect(() => {
+    // Firestore listener (Passive)
     const unsub = onSnapshot(doc(db, 'orders', orderId), (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
@@ -33,8 +34,29 @@ export default function CheckoutPixPopup({ orderId, total, pixData, onSuccess, o
       }
     });
 
-    return () => unsub();
-  }, [orderId, onSuccess]);
+    // Polling Backend (Active fallback for when webhooks fail)
+    const pollInterval = setInterval(async () => {
+      if (status === 'confirmed') return;
+      
+      try {
+        const baseUrl = import.meta.env.VITE_API_URL || '';
+        const response = await fetch(`${baseUrl}/api/check-payment/${orderId}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.status === 'approved') {
+            setStatus('confirmed');
+          }
+        }
+      } catch (err) {
+        console.error("Polling check-payment error:", err);
+      }
+    }, 5000); // Check every 5 seconds
+
+    return () => {
+      unsub();
+      clearInterval(pollInterval);
+    };
+  }, [orderId, onSuccess, status]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(pixData.qr_code);
@@ -106,9 +128,13 @@ export default function CheckoutPixPopup({ orderId, total, pixData, onSuccess, o
                 </div>
               </div>
 
-              <div className="flex items-center justify-center gap-3 py-4 bg-blue-50/50 rounded-2xl border border-blue-100/50">
-                <Loader2 className="w-4 h-4 text-brand-blue animate-spin" />
-                <span className="text-[11px] text-brand-blue font-black uppercase tracking-wider">Aguardando Pagamento...</span>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-center gap-3 py-4 bg-blue-50/50 rounded-2xl border border-blue-100/50">
+                  <Loader2 className="w-4 h-4 text-brand-blue animate-spin" />
+                  <span className="text-[11px] text-brand-blue font-black uppercase tracking-wider">
+                    Aguardando Pagamento...
+                  </span>
+                </div>
               </div>
 
               <p className="text-[10px] text-gray-400 font-bold leading-relaxed px-4">
