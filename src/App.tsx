@@ -526,9 +526,6 @@ export default function App() {
     };
 
     try {
-      // Write to Firestore /orders/{orderId} securely
-      await setDoc(doc(db, 'orders', generatedOrderId), newOrder);
-
       // If it's PIX, create payment on Mercado Pago
       if (paymentMethod === 'pix') {
         const response = await fetch('/api/create-pix', {
@@ -551,11 +548,15 @@ export default function App() {
         });
 
         if (!response.ok) {
-          throw new Error('Falha ao gerar o pagamento via Pix. Tente novamente.');
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Falha ao gerar o pagamento via Pix. Tente outro método ou revise seus dados.');
         }
 
         const mpData = await response.json();
         
+        // ONLY write to Firestore if PIX was successfully generated
+        await setDoc(doc(db, 'orders', generatedOrderId), newOrder);
+
         setPixPaymentData({
           orderId: generatedOrderId,
           total: finalOrderTotal,
@@ -563,6 +564,9 @@ export default function App() {
           qr_code_base64: mpData.point_of_interaction.transaction_data.qr_code_base64
         });
       } else {
+        // Card/Cash - write to Firestore directly
+        await setDoc(doc(db, 'orders', generatedOrderId), newOrder);
+
         // For Card/Cash, we show the success modal directly as requested
         setCheckoutSuccessModal({
           opened: true,
@@ -578,12 +582,17 @@ export default function App() {
       // Decrement catalog stock in Firestore
       for (const item of selectedItems) {
         const prodRef = doc(db, 'products', item.product.id);
-        const newStock = Math.max(0, item.product.stock - item.quantity);
-        await setDoc(prodRef, { stock: newStock }, { merge: true });
+        const prodDoc = await getDoc(prodRef);
+        const currentStock = prodDoc.exists() ? (prodDoc.data().stock || 0) : 0;
+        const currentSales = prodDoc.exists() ? (prodDoc.data().salesCount || 0) : 0;
         
-        // Bonus: Increment product sales count!
-        const newSalesCount = item.product.salesCount + item.quantity;
-        await setDoc(prodRef, { salesCount: newSalesCount }, { merge: true });
+        const newStock = Math.max(0, currentStock - item.quantity);
+        const newSalesCount = currentSales + item.quantity;
+        
+        await setDoc(prodRef, { 
+          stock: newStock,
+          salesCount: newSalesCount 
+        }, { merge: true });
       }
 
       // Decrement used coin balances if coupon applied, or award 10 ItaCoins per purchase!
@@ -594,8 +603,9 @@ export default function App() {
 
       // Clear checked items from the React cart layout
       setCart((prev) => prev.filter((item) => !item.selected));
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, `orders/${generatedOrderId}`);
+    } catch (error: any) {
+      console.error("Checkout Error:", error);
+      showToast(error.message || 'Erro ao processar seu pedido. Tente novamente.');
     }
   };
 

@@ -35,6 +35,7 @@ interface MeViewProps {
       quantity: number;
       color: string;
       size: string;
+      selectedSpec?: Record<string, string>;
     }[];
   }[];
   onClearHistory: () => void;
@@ -284,10 +285,12 @@ export default function MeView({
                                 alt={item.product.name} 
                               />
                               <div className="flex-1 min-w-0">
-                                <h4 className="text-[11px] font-black text-gray-800 truncate">{item.product.name}</h4>
-                                <p className="text-[9.5px] text-gray-400 font-bold">
-                                  Opção: {item.color} | Tam/Volts: {item.size}
-                                </p>
+                                <h4 className="text-[11px] font-black text-gray-800 truncate uppercase">{item.product.name}</h4>
+                                {item.selectedSpec && Object.keys(item.selectedSpec).length > 0 && (
+                                  <p className="text-[9.5px] text-gray-400 font-bold uppercase">
+                                    {Object.entries(item.selectedSpec).map(([k, v]) => `${k}: ${v}`).join(' | ')}
+                                  </p>
+                                )}
                               </div>
                               <div className="text-right shrink-0">
                                 <span className="text-[11px] font-black text-gray-800 block animate-fade-in">R$ {item.product.price.toFixed(2)}</span>
@@ -336,9 +339,10 @@ export default function MeView({
                               : order.status === 'Pendente' ? 'bg-brand-blue animate-pulse' : 'bg-gray-200'
                           }`} />
                           <div>
-                            <span className="text-[11.5px] font-black text-gray-850 block">Em Processamento e Separação</span>
+                            <span className="text-[11.5px] font-black text-gray-850 block">Processamento e Separação</span>
                             <span className="text-[9.5px] text-gray-400 mt-0.5 block">
-                              {order.status === 'Pedido sendo empacotado' ? 'Seu pedido está sendo cuidadosamente empacotado.' : 'Verificando estoque e preparando itens.'}
+                              {order.status === 'Pedido sendo empacotado' ? 'Seu pedido está sendo cuidadosamente empacotado.' : 
+                               ['Processamento', 'Pedido sendo empacotado', 'Pedido saindo para entrega', 'Pedido entregue'].includes(order.status) ? 'Estoque verificado e itens em preparação.' : 'Aguardando início do processamento.'}
                             </span>
                           </div>
                         </div>
@@ -346,13 +350,14 @@ export default function MeView({
                         {/* Step 3: Em Rota de entrega */}
                         <div className="relative">
                           <div className={`absolute -left-[24.5px] top-0.5 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center shadow-xs ${
-                            order.status === 'Pedido entregue' ? 'bg-emerald-500' :
+                            ['Pedido saindo para entrega', 'Pedido entregue'].includes(order.status) ? 'bg-emerald-500' :
                             order.status === 'Pedido saindo para entrega' ? 'bg-brand-blue animate-pulse' : 'bg-gray-200'
                           }`} />
                           <div>
                             <span className="text-[11.5px] font-black text-gray-850 block">Rota de Entrega Expresso</span>
                             <span className="text-[9.5px] text-gray-400 mt-0.5 block">
-                              {order.status === 'Pedido saindo para entrega' ? 'O entregador já saiu com seu pedido!' : 'Saiu da central para o destino final.'}
+                              {order.status === 'Pedido saindo para entrega' ? 'O entregador já saiu com seu pedido para Itacoatiara!' : 
+                               order.status === 'Pedido entregue' ? 'Entrega concluída.' : 'Aguardando saída para entrega.'}
                             </span>
                           </div>
                         </div>
@@ -365,7 +370,7 @@ export default function MeView({
                           <div>
                             <span className="text-[11.5px] font-black text-gray-850 block">Pedido Entregue</span>
                             <span className="text-[9.5px] text-gray-400 mt-0.5 block">
-                              {order.status === 'Pedido entregue' ? 'Finalizado - Entregue com sucesso.' : 'Obrigado por comprar na ItaBuy!'}
+                              {order.status === 'Pedido entregue' ? 'Finalizado - Entregue com sucesso.' : 'A confirmação final será após a entrega.'}
                             </span>
                           </div>
                         </div>
