@@ -14,7 +14,14 @@ interface MeViewProps {
     total: number;
     itemsCount: number;
     status: string;
-    address?: string;
+    address?: string | {
+      street: string;
+      number: string;
+      neighborhood: string;
+      reference: string;
+      fullname: string;
+      email: string;
+    } | null;
     paymentMethod?: 'pix' | 'cartao' | 'dinheiro';
     needsChange?: boolean;
     changeAmount?: string;
@@ -307,81 +314,61 @@ export default function MeView({
                       <div className="space-y-4 relative pl-4.5 border-l-2 border-brand-blue/15 ml-2.5 font-sans">
                         
                         {/* Step 1: Pedido Confirmado / Pago */}
-                        {(!order.paymentMethod || order.paymentMethod === 'pix') ? (
-                          /* Version 1: PIX */
-                          <div className="relative">
-                            <div className="absolute -left-[24.5px] top-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center shadow-xs animate-fade-in" />
-                            <div>
-                              <span className="text-[11.5px] font-black text-gray-850 block">Pedido Confirmado e Pago</span>
-                              <span className="text-[9.5px] text-gray-400 mt-0.5 block">{order.date} - Pagamento Aprovado via PIX</span>
-                            </div>
-                          </div>
-                        ) : (
-                          /* Version 2: Cartao / Dinheiro */
-                          <div className="relative">
-                            <div className="absolute -left-[24.5px] top-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center shadow-xs animate-fade-in" />
-                            <div>
-                              <span className="text-[11.5px] font-black text-gray-850 block">Pedido Confirmado</span>
-                              <span className="text-[9.5px] text-gray-400 mt-0.5 block">
-                                {order.date} - Aguardando entrega para pagamento ({order.paymentMethod === 'cartao' ? 'Cartão de Crédito/Débito' : 'Dinheiro em Espécie'})
-                              </span>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Step 2: Em separação */}
-                        <div className="relative hidden sm:block">
-                          <div className={`absolute -left-[24.5px] top-0.5 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center shadow-xs ${
-                            order.status !== 'Pendente' ? 'bg-emerald-500' : 'bg-brand-blue animate-pulse'
+                        <div className="relative">
+                          <div className={`absolute -left-[24.5px] top-0.5 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center shadow-xs animate-fade-in ${
+                            order.status !== 'Aguardando Pagamento' ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'
                           }`} />
                           <div>
-                            <span className="text-[11.5px] font-black text-gray-850 block">Separação e Nota Fiscal emitida</span>
-                            <span className="text-[9.5px] text-gray-400 mt-0.5 block">Empacotado com garantia de Devolução de 7 dias</span>
+                            <span className="text-[11.5px] font-black text-gray-850 block">
+                              {order.status === 'Aguardando Pagamento' ? 'Aguardando Pagamento' : 'Pedido Confirmado'}
+                            </span>
+                            <span className="text-[9.5px] text-gray-400 mt-0.5 block">
+                              {order.date} - {order.status === 'Aguardando Pagamento' ? 'Seu pagamento ainda não foi processado.' : 'Seu pedido foi recebido e confirmado.'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Step 2: Em separação / Processamento */}
+                        <div className="relative">
+                          <div className={`absolute -left-[24.5px] top-0.5 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center shadow-xs ${
+                            ['Processamento', 'Pedido sendo empacotado', 'Pedido saindo para entrega', 'Pedido entregue'].includes(order.status) 
+                              ? 'bg-emerald-500' 
+                              : order.status === 'Pendente' ? 'bg-brand-blue animate-pulse' : 'bg-gray-200'
+                          }`} />
+                          <div>
+                            <span className="text-[11.5px] font-black text-gray-850 block">Em Processamento e Separação</span>
+                            <span className="text-[9.5px] text-gray-400 mt-0.5 block">
+                              {order.status === 'Pedido sendo empacotado' ? 'Seu pedido está sendo cuidadosamente empacotado.' : 'Verificando estoque e preparando itens.'}
+                            </span>
                           </div>
                         </div>
 
                         {/* Step 3: Em Rota de entrega */}
                         <div className="relative">
                           <div className={`absolute -left-[24.5px] top-0.5 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center shadow-xs ${
-                            order.status === 'Entregue' ? 'bg-emerald-500' :
-                            order.status === 'A Caminho' ? 'bg-brand-blue animate-pulse' : 'bg-gray-200'
+                            order.status === 'Pedido entregue' ? 'bg-emerald-500' :
+                            order.status === 'Pedido saindo para entrega' ? 'bg-brand-blue animate-pulse' : 'bg-gray-200'
                           }`} />
                           <div>
-                            <span className="text-[11.5px] font-black text-gray-850 block">Rota Expresso Itacoatiara AM</span>
+                            <span className="text-[11.5px] font-black text-gray-850 block">Rota de Entrega Expresso</span>
                             <span className="text-[9.5px] text-gray-400 mt-0.5 block">
-                              {order.status === 'Pendente' ? 'Aguardando despacho' : 'Despachado ao entregador autorizado local'}
+                              {order.status === 'Pedido saindo para entrega' ? 'O entregador já saiu com seu pedido!' : 'Saiu da central para o destino final.'}
                             </span>
                           </div>
                         </div>
 
-                        {/* Step 4: Entregue (And depending on payment confirmation) */}
-                        {(!order.paymentMethod || order.paymentMethod === 'pix') ? (
-                          /* Version 1: PIX */
-                          <div className="relative pb-1">
-                            <div className={`absolute -left-[24.5px] top-0.5 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center shadow-xs ${
-                              order.status === 'Entregue' ? 'bg-emerald-500' : 'bg-gray-200'
-                            }`} />
-                            <div>
-                              <span className="text-[11.5px] font-black text-gray-850 block">Entregue no endereço cadastrado</span>
-                              <span className="text-[9.5px] text-gray-400 mt-0.5 block">
-                                {order.status === 'Entregue' ? 'Finalizado - Recebido pelo cliente' : 'Entrega prioritária prevista hoje'}
-                              </span>
-                            </div>
+                        {/* Step 4: Entregue */}
+                        <div className="relative pb-1">
+                          <div className={`absolute -left-[24.5px] top-0.5 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center shadow-xs ${
+                            order.status === 'Pedido entregue' ? 'bg-emerald-500' : 'bg-gray-200'
+                          }`} />
+                          <div>
+                            <span className="text-[11.5px] font-black text-gray-850 block">Pedido Entregue</span>
+                            <span className="text-[9.5px] text-gray-400 mt-0.5 block">
+                              {order.status === 'Pedido entregue' ? 'Finalizado - Entregue com sucesso.' : 'Obrigado por comprar na ItaBuy!'}
+                            </span>
                           </div>
-                        ) : (
-                          /* Version 2: Cartao / Dinheiro */
-                          <div className="relative pb-1">
-                            <div className={`absolute -left-[24.5px] top-0.5 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center shadow-xs ${
-                              order.status === 'Entregue' ? 'bg-emerald-500' : 'bg-gray-200'
-                            }`} />
-                            <div>
-                              <span className="text-[11.5px] font-black text-gray-850 block">Entregue e pagamento confirmado</span>
-                              <span className="text-[9.5px] text-gray-400 mt-0.5 block">
-                                {order.status === 'Entregue' ? 'Finalizado - Recebido e pago na entrega' : 'Entrega com maquininha e recebimento previstos para hoje'}
-                              </span>
-                            </div>
-                          </div>
-                        )}
+                        </div>
 
                       </div>
                     </div>
@@ -390,9 +377,11 @@ export default function MeView({
                     <div className="bg-slate-50 p-2.5 rounded-xl border border-gray-100 flex gap-2 text-[10.5px] text-gray-500">
                       <MapPin className="w-4 h-4 text-gray-400 shrink-0" />
                       <div className="min-w-0">
-                        <span className="font-extrabold text-gray-700 block">Endereço de Entrega Cadastrado:</span>
+                        <span className="font-extrabold text-gray-700 block">Endereço de Entrega:</span>
                         <span className="mt-0.5 block text-gray-650 font-semibold break-words">
-                          {order.address || "Rua, Número, Bairro, e Ponto de Referência não informados."}
+                          {(typeof order.address === 'object' && order.address !== null) 
+                            ? `${(order.address as any).street || '--'}, ${(order.address as any).number || '--'} - ${(order.address as any).neighborhood || '--'} (${(order.address as any).reference || '--'})`
+                            : (typeof order.address === 'string' ? order.address : "Endereço não informado.")}
                         </span>
                       </div>
                     </div>

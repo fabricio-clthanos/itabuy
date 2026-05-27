@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Trash2, ShieldCheck, Ticket, Heart, ChevronRight, MapPin, CreditCard } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Trash2, ShieldCheck, Ticket, Heart, ChevronRight, MapPin, CreditCard, Copy, CheckCircle2, Loader2, X } from 'lucide-react';
 import { CartItem, Coupon, Product } from '../types';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface CartViewProps {
   cartItems: CartItem[];
@@ -11,7 +12,14 @@ interface CartViewProps {
   coupons: Coupon[];
   onCheckout: (
     appliedCoupon: Coupon | null,
-    address: string,
+    address: {
+      street: string;
+      number: string;
+      neighborhood: string;
+      reference: string;
+      fullname: string;
+      email: string;
+    },
     paymentMethod: 'pix' | 'cartao' | 'dinheiro',
     needsChange: boolean,
     changeAmount: string
@@ -68,10 +76,8 @@ export default function CartView({
   }
 
   // Shipping
-  const rawShipping = selectedItems.length > 0 ? 15 : 0;
-  // Free shipping conditions (above 39 or ITAFRETE coupon applied)
-  const isFreeShipping = itemsSubtotal >= 39 || (selectedCoupon && selectedCoupon.code === 'ITAFRETE');
-  const shippingCost = isFreeShipping ? 0 : rawShipping;
+  const shippingCost = 0;
+  const isFreeShipping = true;
 
   const orderTotal = Math.max(0, itemsSubtotal - couponDiscount + shippingCost);
 
@@ -137,8 +143,15 @@ export default function CartView({
       return;
     }
 
-    const fullAddress = `Rua: ${street.trim()}, Nº: ${number.trim()}, Bairro: ${neighborhood.trim()} - Ref: ${reference.trim()}`;
-    onCheckout(selectedCoupon, fullAddress, paymentMethod, needsChange, changeAmount);
+    const addressObj = {
+      street: street.trim(),
+      number: number.trim(),
+      neighborhood: neighborhood.trim(),
+      reference: reference.trim(),
+      fullname: '', // Will be filled in App.tsx
+      email: ''     // Will be filled in App.tsx
+    };
+    onCheckout(selectedCoupon, addressObj, paymentMethod, needsChange, changeAmount);
   };
 
   return (
@@ -574,13 +587,7 @@ export default function CartView({
 
                   <div className="flex justify-between">
                     <span>Custo Frete</span>
-                    <span>
-                      {shippingCost === 0 ? (
-                        <span className="text-brand-blue font-black">Grátis 🚚</span>
-                      ) : (
-                        `R$ ${shippingCost.toFixed(2)}`
-                      )}
-                    </span>
+                    <span className="text-brand-blue font-black">Grátis 🚚</span>
                   </div>
 
                   <div className="border-t border-gray-100 pt-2 flex justify-between font-black text-sm text-gray-900">
@@ -610,7 +617,7 @@ export default function CartView({
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                     }`}
                   >
-                    FECHAR PEDIDO
+                    FINALIZAR PEDIDO
                   </button>
 
                 </div>

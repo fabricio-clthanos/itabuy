@@ -4,7 +4,7 @@ import {
   Home as HomeIcon, ShoppingCart as CartIcon, User as UserIcon, 
   Sparkles, Check, ChevronRight, X, Smartphone, Tv, Shirt, 
   Sparkles as SparklesIcon, Footprints, Home as HomeIcon2, 
-  Dumbbell, Gamepad2, Compass, Trophy
+  Dumbbell, Gamepad2, Compass, Trophy, Loader2
 } from 'lucide-react';
 import { Product, CartItem, Coupon } from './types';
 import Header from './components/Header';
@@ -17,6 +17,7 @@ import FlashDealsView from './components/FlashDealsView';
 import CategoryView from './components/CategoryView';
 import AdminDashboard from './components/AdminDashboard';
 import OptionsPickerPopup from './components/OptionsPickerPopup';
+import CheckoutPixPopup from './components/CheckoutPixPopup';
 
 // Firebase core imports
 import { auth, db } from './lib/firebase';
@@ -111,7 +112,7 @@ export default function App() {
     orderId: string;
     total: number;
     method: 'pix' | 'cartao' | 'dinheiro';
-    address?: string;
+    address?: any;
     needsChange?: boolean;
     changeAmount?: string;
   }>({
@@ -119,10 +120,18 @@ export default function App() {
     orderId: '',
     total: 0,
     method: 'pix',
-    address: '',
+    address: null,
     needsChange: false,
     changeAmount: ''
   });
+
+  // State for Pix Payment
+  const [pixPaymentData, setPixPaymentData] = useState<{
+    orderId: string;
+    total: number;
+    qr_code: string;
+    qr_code_base64: string;
+  } | null>(null);
 
   // State for Options Picker
   const [pickingOptionsProduct, setPickingOptionsProduct] = useState<Product | null>(null);
@@ -446,7 +455,14 @@ export default function App() {
   // Dynamic real persistent Firestore checkouts
   const handleCheckout = async (
     couponApplied: Coupon | null, 
-    address: string,
+    address: {
+      street: string;
+      number: string;
+      neighborhood: string;
+      reference: string;
+      fullname: string;
+      email: string;
+    },
     paymentMethod: 'pix' | 'cartao' | 'dinheiro',
     needsChange: boolean,
     changeAmount: string
@@ -460,6 +476,10 @@ export default function App() {
       return;
     }
 
+    // Enrich address with user info
+    address.fullname = firebaseUser.displayName || 'Cliente ItaBuy';
+    address.email = firebaseUser.email || '';
+
     const subtotal = selectedItems.reduce((acc, item) => acc + item.product.price * item.quantity, 0);
     
     // Apply discount
@@ -472,20 +492,23 @@ export default function App() {
       }
     }
 
-    const shipping = subtotal >= 39 || (couponApplied && couponApplied.code === 'ITAFRETE') ? 0 : 15;
+    const shipping = 0;
     const finalOrderTotal = Math.max(0, subtotal - discount + shipping);
 
     const generatedOrderId = Math.floor(100000 + Math.random() * 900000).toString();
-    const currentDateStr = new Date().toLocaleDateString('pt-BR');
+    const now = new Date();
+    const currentDateStr = now.toLocaleDateString('pt-BR');
+    const timestamp = now.getTime();
 
     // Create history item for Firestore
     const newOrder = {
       id: generatedOrderId,
       userId: firebaseUser.uid,
       date: currentDateStr,
+      timestamp: timestamp,
       total: finalOrderTotal,
       itemsCount: selectedItems.reduce((sum, i) => sum + i.quantity, 0),
-      status: 'Pendente',
+      status: paymentMethod === 'pix' ? 'Aguardando Pagamento' : 'Pendente',
       address,
       paymentMethod,
       needsChange,
@@ -506,6 +529,52 @@ export default function App() {
       // Write to Firestore /orders/{orderId} securely
       await setDoc(doc(db, 'orders', generatedOrderId), newOrder);
 
+      // If it's PIX, create payment on Mercado Pago
+      if (paymentMethod === 'pix') {
+        const response = await fetch('/api/create-pix', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            transaction_amount: finalOrderTotal,
+            description: `Pedido #${generatedOrderId} na ItaBuy`,
+            payer: {
+              email: firebaseUser.email || 'cliente@itabuy.com', // Fallback email
+              first_name: firebaseUser.displayName?.split(' ')[0] || 'Cliente',
+              last_name: firebaseUser.displayName?.split(' ').slice(1).join(' ') || 'ItaBuy',
+              identification: {
+                type: 'CPF',
+                number: '000.000.000-00' // In a real app, this should be collected
+              }
+            },
+            orderId: generatedOrderId
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Falha ao gerar o pagamento via Pix. Tente novamente.');
+        }
+
+        const mpData = await response.json();
+        
+        setPixPaymentData({
+          orderId: generatedOrderId,
+          total: finalOrderTotal,
+          qr_code: mpData.point_of_interaction.transaction_data.qr_code,
+          qr_code_base64: mpData.point_of_interaction.transaction_data.qr_code_base64
+        });
+      } else {
+        // For Card/Cash, we show the success modal directly as requested
+        setCheckoutSuccessModal({
+          opened: true,
+          orderId: generatedOrderId,
+          total: finalOrderTotal,
+          method: paymentMethod,
+          address,
+          needsChange,
+          changeAmount
+        });
+      }
+
       // Decrement catalog stock in Firestore
       for (const item of selectedItems) {
         const prodRef = doc(db, 'products', item.product.id);
@@ -525,17 +594,6 @@ export default function App() {
 
       // Clear checked items from the React cart layout
       setCart((prev) => prev.filter((item) => !item.selected));
-
-      // Show completed dialog
-      setCheckoutSuccessModal({
-        opened: true,
-        orderId: generatedOrderId,
-        total: finalOrderTotal,
-        method: paymentMethod,
-        address,
-        needsChange,
-        changeAmount
-      });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `orders/${generatedOrderId}`);
     }
@@ -813,28 +871,13 @@ export default function App() {
 
                   {/* Delivery Address display */}
                   <div className="w-full text-left bg-blue-50/20 border border-blue-100/50 p-2.5 rounded-lg mb-3 text-[10.5px] text-gray-600 line-clamp-2">
-                    📍 <strong>Entrega em:</strong> {checkoutSuccessModal.address}
+                    📍 <strong>Entrega em:</strong> {checkoutSuccessModal.address?.street}, {checkoutSuccessModal.address?.number} - {checkoutSuccessModal.address?.neighborhood}
                   </div>
 
                   {checkoutSuccessModal.method === 'pix' && (
-                    <div className="w-full">
-                      <span className="text-[10px] font-bold text-teal-650 text-teal-600 bg-teal-50 border border-teal-150 px-2 py-0.5 rounded-md block text-center mb-2">
-                        🌀 PAGAMENTO VIA PIX COPIA E COLA
-                      </span>
-
-                      <div className="bg-gray-100 p-2 rounded-md text-[9px] font-mono break-all line-clamp-1 border border-gray-250 select-all text-gray-500">
-                        itabuy_payment_pix_key_00020126580014br_g
-                      </div>
-
-                      <button
-                        onClick={() => {
-                          alert('Código de teste Pix copiado com sucesso! Cole no seu internet banking.');
-                          showToast('Código copiado com sucesso.');
-                        }}
-                        className="w-full bg-brand-blue text-white font-bold text-xs py-2 mt-1.5 rounded-md hover:bg-brand-blue-hover active:scale-95 transition-transform"
-                      >
-                        Copiar Pix
-                      </button>
+                    <div className="w-full flex flex-col items-center py-4 bg-blue-50/30 rounded-xl border border-blue-100">
+                      <Loader2 className="w-6 h-6 text-brand-blue animate-spin mb-2" />
+                      <p className="text-[11px] text-brand-blue font-black uppercase tracking-widest">Processando Pix...</p>
                     </div>
                   )}
 
@@ -896,6 +939,27 @@ export default function App() {
               />
             )}
           </AnimatePresence>
+          {/* 7. Mercado Pago Pix Popup */}
+          {pixPaymentData && (
+            <CheckoutPixPopup 
+              orderId={pixPaymentData.orderId}
+              total={pixPaymentData.total}
+              pixData={{
+                qr_code: pixPaymentData.qr_code,
+                qr_code_base64: pixPaymentData.qr_code_base64
+              }}
+              onSuccess={() => {
+                setPixPaymentData(null);
+                setCurrentView('me');
+                showToast('Pagamento confirmado! 🚀');
+              }}
+              onClose={() => {
+                setPixPaymentData(null);
+                setCurrentView('me'); // Redirect to Me view to see the pending order
+                showToast('Pedido reservado! Pague para confirmar.');
+              }}
+            />
+          )}
         </div>
       )}
     </div>
