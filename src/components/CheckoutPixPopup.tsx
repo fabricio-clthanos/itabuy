@@ -39,7 +39,8 @@ export default function CheckoutPixPopup({ orderId, total, pixData, onSuccess, o
       if (status === 'confirmed') return;
       
       try {
-        const baseUrl = import.meta.env.VITE_API_URL || '';
+        const rawBaseUrl = import.meta.env.VITE_API_URL || '';
+        const baseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
         const response = await fetch(`${baseUrl}/api/check-payment/${orderId}`);
         if (response.ok) {
           const data = await response.json();

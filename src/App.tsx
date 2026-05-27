@@ -528,7 +528,8 @@ export default function App() {
     try {
       // If it's PIX, create payment on Mercado Pago
       if (paymentMethod === 'pix') {
-        const baseUrl = import.meta.env.VITE_API_URL || '';
+        const rawBaseUrl = import.meta.env.VITE_API_URL || '';
+        const baseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
         const response = await fetch(`${baseUrl}/api/create-pix`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -623,7 +624,11 @@ export default function App() {
       setCart((prev) => prev.filter((item) => !item.selected));
     } catch (error: any) {
       console.error("Checkout Error:", error);
-      showToast(error.message || 'Erro ao processar seu pedido. Tente novamente.');
+      let userMsg = error.message || 'Erro ao processar seu pedido. Tente novamente.';
+      if (error && (error.message === 'Failed to fetch' || error.message?.includes('fetch'))) {
+        userMsg = 'Erro de Conexão (API): A variável VITE_API_URL no Vercel não foi configurada ou aponta para uma URL privada. Configure-a com a URL Pública (Shared App URL) do Cloud Run do AI Studio.';
+      }
+      showToast(userMsg);
     }
   };
 
