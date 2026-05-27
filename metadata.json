@@ -1,0 +1,6 @@
+{
+  "name": "ItaBuy",
+  "description": "Loja online ItaBuy inspirada na experiência de e-commerce mobile da Shopee, rápida, fluida e leve.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

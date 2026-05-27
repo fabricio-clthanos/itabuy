@@ -1,0 +1,93 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "A product available in the store",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the product" },
+        "name": { "type": "string", "description": "Product name" },
+        "price": { "type": "number", "description": "Current selling price" },
+        "originalPrice": { "type": "number", "description": "Original price before discount" },
+        "rating": { "type": "number", "description": "Product rating out of 5" },
+        "salesCount": { "type": "number", "description": "Volume/quantity of sales for this product" },
+        "freeShipping": { "type": "boolean", "description": "Whether shipping is free" },
+        "discountPercentage": { "type": "number", "description": "Discount in percentage" },
+        "images": { "type": "array", "description": "Product image URLs" },
+        "category": { "type": "string", "description": "Category identifier" },
+        "location": { "type": "string", "description": "Origin location of the product" },
+        "stock": { "type": "number", "description": "Current remaining stock" },
+        "description": { "type": "string", "description": "Detailed description of product features" },
+        "storeName": { "type": "string", "description": "Name of the seller partition" },
+        "storeRating": { "type": "number", "description": "Rating of the store" },
+        "storeProductsCount": { "type": "number", "description": "Count of other products from the store" }
+      },
+      "required": ["id", "name", "price", "rating", "salesCount", "freeShipping", "images", "category", "stock", "description"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A purchase order placed by a customer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Order unique identifier" },
+        "userId": { "type": "string", "description": "UID of the buyer" },
+        "date": { "type": "string", "description": "Formatted timestamp of order" },
+        "total": { "type": "number", "description": "Grand total charged" },
+        "itemsCount": { "type": "number", "description": "Total count of quantities" },
+        "status": { "type": "string", "description": "Status of order tracking", "enum": ["Pendente", "A Caminho", "Entregue"] },
+        "address": { "type": "string", "description": "Full shipping address" },
+        "paymentMethod": { "type": "string", "enum": ["pix", "cartao", "dinheiro"] },
+        "needsChange": { "type": "boolean" },
+        "changeAmount": { "type": "string" },
+        "items": { "type": "array", "description": "Array of ordered products with custom specs" }
+      },
+      "required": ["id", "userId", "date", "total", "itemsCount", "status", "address", "paymentMethod", "items"]
+    },
+    "Coupon": {
+      "title": "Coupon",
+      "description": "A coupon code available for claiming discount",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "code": { "type": "string" },
+        "discount": { "type": "number" },
+        "type": { "type": "string", "enum": ["percentage", "fixed"] },
+        "minSpent": { "type": "number" },
+        "title": { "type": "string" },
+        "expiry": { "type": "string" }
+      },
+      "required": ["id", "code", "discount", "type", "minSpent", "title", "expiry"]
+    },
+    "User": {
+      "title": "User",
+      "description": "A user profile in the database",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "coins": { "type": "number" },
+        "claimedCouponIds": { "type": "array" }
+      },
+      "required": ["uid", "email", "coins"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Collection of all items shown on the store"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Checkout details of orders placed by users"
+    },
+    "/coupons/{couponId}": {
+      "schema": "Coupon",
+      "description": "Available vouchers"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Private profile information for a customer"
+    }
+  }
+}
