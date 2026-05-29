@@ -1,9 +1,11 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --color-brand-blue: #0046BE;
+  --color-brand-blue: #002A94;
   --color-brand-yellow: #FFF200;
-  --color-brand-blue-hover: #0036a3;
+  --color-brand-blue-hover: #001F70;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer utilities {
@@ -26,4 +28,269 @@
 /* Custom transitions and optimization classes for mobile phones */
 .ios-scroll-inertia {
   -webkit-overflow-scrolling: touch;
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  display: flex;
+  animation: marquee 22s linear infinite;
+}
+
+/* Dark Mode Style Overrides */
+.dark-theme-wrapper {
+  background-color: #0b111e !important;
+  color: #f1f5f9 !important;
+}
+
+.dark-theme-wrapper .bg-white,
+.dark-theme-wrapper .bg-slate-50,
+.dark-theme-wrapper .bg-gray-50 {
+  background-color: #111a2e !important;
+  color: #f3f4f6 !important;
+}
+
+.dark-theme-wrapper .border-gray-100,
+.dark-theme-wrapper .border-gray-200,
+.dark-theme-wrapper .border-gray-150,
+.dark-theme-wrapper .border-gray-205 {
+  border-color: #212f4d !important;
+}
+
+.dark-theme-wrapper .text-gray-900,
+.dark-theme-wrapper .text-gray-800,
+.dark-theme-wrapper .text-gray-700,
+.dark-theme-wrapper .text-slate-900 {
+  color: #f3f4f6 !important;
+}
+
+.dark-theme-wrapper .text-gray-500,
+.dark-theme-wrapper .text-gray-600,
+.dark-theme-wrapper .text-slate-500 {
+  color: #8fa0ba !important;
+}
+
+.dark-theme-wrapper div[class*="bg-[#FAF9F5]"] {
+  background-color: #17243c !important;
+}
+
+.dark-theme-wrapper header,
+.dark-theme-wrapper .bg-brand-blue {
+  background-color: #0c1527 !important;
+}
+
+.dark-theme-wrapper #footer {
+  background: linear-gradient(to right, #090e1a, #131c30, #090e1a) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Mascot Keyframe Animations */
+@keyframes mascot-float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-3px) rotate(1deg); }
+}
+
+@keyframes mascot-arm-actions {
+  0% { transform: rotate(0deg) scale(1); }
+  22% { transform: translate(-3px, -4px) rotate(-35deg) scale(1.1); }
+  45% { transform: translate(-14px, -11px) rotate(-65deg) scale(1.25); }
+  50% { transform: translate(-16px, -12px) rotate(-70deg) scale(1.3); }
+  68% { transform: translate(-8px, -6px) rotate(-40deg) scale(1.1); }
+  85% { transform: translate(-10px, -8px) rotate(-50deg) scale(1.15); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+
+@keyframes mascot-laugh {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  15%, 45%, 75% { transform: scale(1.08, 0.95) rotate(-3deg) translateY(1px); }
+  30%, 60%, 90% { transform: scale(0.95, 1.05) rotate(3deg) translateY(-1px); }
+}
+
+@keyframes mascot-eyes {
+  0%, 20%, 80%, 100% { transform: scaleY(1); }
+  10%, 90% { transform: scaleY(0.1); }
+  30%, 70% { transform: scaleY(0.6) translateY(-1px); }
+}
+
+@keyframes tap-ripple {
+  0% { transform: scale(0); opacity: 0; }
+  30% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+/* Base Mascot Classes */
+.mascot-container {
+  opacity: 0;
+  transform: translateY(15px) scale(0.4);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.group:hover .mascot-container {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.mascot-body-element {
+  animation: mascot-float 3s ease-in-out infinite;
+}
+
+.group:hover .mascot-body-element {
+  animation: mascot-laugh 1.4s ease-in-out infinite;
+}
+
+.mascot-arm-element {
+  transform-origin: 22px 18px;
+}
+
+.group:hover .mascot-arm-element {
+  animation: mascot-arm-actions 2.5s ease-in-out infinite;
+}
+
+.mascot-eye {
+  transform-origin: center;
+  animation: mascot-eyes 4s ease-in-out infinite;
+}
+
+.group:hover .mascot-eye {
+  animation: mascot-eyes 1.4s ease-in-out infinite;
+}
+
+/* Tap ripple visual feedback overlay on image */
+.mascot-ripple {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid #ffde00;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0);
+}
+
+.group:hover .mascot-ripple {
+  animation: tap-ripple 3s ease-out infinite;
+}
+
+/* --- Mascot Interactive Animation Routines --- */
+
+/* 1. CLIMBER ANIMATION (9-second realistic struggle route with hidden pauses) */
+@keyframes climb-routine {
+  0% { bottom: -45px; right: 2px; transform: scale(0.6) rotate(0deg); opacity: 0; }
+  10% { bottom: -45px; right: 2px; transform: scale(0.8) rotate(5deg); opacity: 0; }
+  22% { bottom: 12%; right: 4px; transform: scale(0.9) rotate(-14deg); opacity: 1; }
+  34% { bottom: 32%; right: 2px; transform: scale(0.95) rotate(14deg); opacity: 1; }
+  46% { bottom: 52%; right: -2px; transform: scale(1) rotate(-10deg); opacity: 1; }
+  52% { bottom: 74%; right: 3px; transform: scale(1.1) rotate(0deg); opacity: 1; }
+  /* Remains at the top while speech bubble is visible */
+  78% { bottom: 74%; right: 3px; transform: scale(1.1) rotate(0deg); opacity: 1; }
+  /* Descends/slides down behind the card very fast */
+  86% { bottom: -50px; right: 3px; transform: scale(0.5) rotate(-22deg); opacity: 0; }
+  100% { bottom: -50px; right: 3px; transform: scale(0) rotate(0deg); opacity: 0; }
+}
+
+@keyframes bubble-show-1 {
+  0%, 51% { opacity: 0; transform: translate(-50%, 8px) scale(0.7); pointer-events: none; }
+  55%, 75% { opacity: 1; transform: translate(-50%, 0) scale(1); pointer-events: auto; }
+  78%, 100% { opacity: 0; transform: translate(-50%, -4px) scale(0.85); pointer-events: none; }
+}
+
+.anim-climber {
+  opacity: 0;
+  bottom: -45px;
+  right: 2px;
+}
+
+.group:hover .anim-climber {
+  animation: climb-routine 9s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
+}
+
+.group:hover .anim-climber-bubble {
+  animation: bubble-show-1 9s ease-in-out infinite;
+}
+
+/* 2. WALK & THINK ANIMATION (8-second route with hidden start and pauses) */
+@keyframes walk-routine {
+  0% { bottom: 2px; right: -40px; transform: scale(0.5) scaleX(1); opacity: 0; }
+  8% { bottom: 2px; right: 2px; transform: scale(1) scaleX(1); opacity: 1; }
+  /* Walk to the left */
+  28% { bottom: 2px; right: 54px; transform: scale(1) scaleX(1); opacity: 1; }
+  /* Face right & think */
+  31% { bottom: 2px; right: 54px; transform: scale(1) scaleX(-1); opacity: 1; }
+  70% { bottom: 2px; right: 54px; transform: scale(1) scaleX(-1); opacity: 1; }
+  /* Walk back right */
+  74% { bottom: 2px; right: 54px; transform: scale(1) scaleX(1); opacity: 1; }
+  88% { bottom: 2px; right: 2px; transform: scale(1) scaleX(1); opacity: 1; }
+  /* Walk offscreen */
+  95% { bottom: 2px; right: -40px; transform: scale(0.6) scaleX(1); opacity: 0; }
+  100% { bottom: 2px; right: -40px; transform: scale(0) scaleX(1); opacity: 0; }
+}
+
+@keyframes bubble-show-2 {
+  0%, 30% { opacity: 0; transform: translate(-50%, 6px) scale(0.7); pointer-events: none; }
+  35%, 67% { opacity: 1; transform: translate(-50%, 0) scale(1); pointer-events: auto; }
+  70%, 100% { opacity: 0; transform: translate(-50%, -4px) scale(0.8); pointer-events: none; }
+}
+
+.anim-walker {
+  opacity: 0;
+  bottom: 2px;
+  right: -40px;
+}
+
+.group:hover .anim-walker {
+  animation: walk-routine 8s ease-in-out infinite;
+}
+
+.group:hover .anim-walker-bubble {
+  animation: bubble-show-2 8s ease-in-out infinite;
+}
+
+/* 3. LOVE HUG & FLOATING HEARTS ANIMATION */
+@keyframes hug-routine {
+  0% { bottom: -40px; right: 2px; transform: scale(0) rotate(0deg); opacity: 0; }
+  10% { bottom: 2px; right: 2px; transform: scale(1) rotate(0deg); opacity: 1; }
+  25% { bottom: 2px; right: 4px; transform: scale(1.15, 0.88) rotate(-6deg); opacity: 1; }
+  50% { bottom: 3px; right: 1px; transform: scale(0.9, 1.15) rotate(4deg); opacity: 1; }
+  75% { bottom: 2px; right: 4px; transform: scale(1.15, 0.88) rotate(-4deg); opacity: 1; }
+  90% { bottom: 2px; right: 2px; transform: scale(1) rotate(0deg); opacity: 1; }
+  95% { bottom: -40px; right: 2px; transform: scale(0.4) rotate(15deg); opacity: 0; }
+  100% { bottom: -40px; right: 2px; transform: scale(0) rotate(0deg); opacity: 0; }
+}
+
+@keyframes heart-rise-1 {
+  0% { transform: translate(0, 0) scale(0); opacity: 0; }
+  15% { transform: translate(-10px, -15px) scale(1); opacity: 1; }
+  45% { transform: translate(-22px, -35px) scale(1.3); opacity: 0.9; }
+  80% { transform: translate(-18px, -55px) scale(1); opacity: 0.4; }
+  100% { transform: translate(-25px, -70px) scale(0.6); opacity: 0; }
+}
+
+@keyframes heart-rise-2 {
+  0% { transform: translate(0, 0) scale(0); opacity: 0; }
+  15% { transform: translate(12px, -12px) scale(0.9); opacity: 1; }
+  50% { transform: translate(6px, -38px) scale(1.25); opacity: 0.85; }
+  85% { transform: translate(14px, -60px) scale(0.9); opacity: 0.3; }
+  100% { transform: translate(8px, -75px) scale(0.5); opacity: 0; }
+}
+
+.anim-lover {
+  opacity: 0;
+  bottom: -40px;
+  right: 2px;
+}
+
+.group:hover .anim-lover {
+  animation: hug-routine 5s ease-in-out infinite;
+}
+
+.group:hover .heart-icon-1 {
+  animation: heart-rise-1 2.5s ease-out infinite;
+}
+
+.group:hover .heart-icon-2 {
+  animation: heart-rise-2 2.8s ease-out infinite;
+  animation-delay: 0.8s;
 }

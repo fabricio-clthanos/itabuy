@@ -1,8 +1,9 @@
 import { useState, FormEvent } from 'react';
 import { 
-  ClipboardList, Star, Shield, HelpCircle, LogOut, CreditCard,
+  ClipboardList, Star, Shield, LogOut, CreditCard,
   Package, Truck, MessageSquare, Gift, ChevronRight, User, Mail, Lock, 
-  CheckCircle2, Copy, RefreshCw, ArrowLeft, Info, MapPin, Sparkles
+  CheckCircle2, Copy, RefreshCw, ArrowLeft, Info, MapPin, Sparkles,
+  Moon, Sun
 } from 'lucide-react';
 import { Coupon, Product } from '../types';
 
@@ -14,6 +15,10 @@ interface MeViewProps {
     total: number;
     itemsCount: number;
     status: string;
+    cancellationRequested?: boolean;
+    cancellationStatus?: string;
+    qr_code?: string;
+    qr_code_base64?: string;
     address?: string | {
       street: string;
       number: string;
@@ -49,7 +54,21 @@ interface MeViewProps {
   onForgotPassword: (email: string) => Promise<void>;
   onLogout: () => Promise<void>;
   onGoogleLogin: () => Promise<void>;
+  onCancelOrder: (order: any) => Promise<void>;
+  onReopenPix?: (orderId: string, total: number, qr_code: string, qr_code_base64: string) => void;
+  darkMode?: boolean;
+  onToggleDarkMode?: () => void;
 }
+
+const getStatusIndex = (status: string) => {
+  if (status === 'Pendente' || status === 'Aguardando Pagamento') return 1;
+  if (status === 'Processamento') return 2;
+  if (status === 'Pedido sendo empacotado') return 3;
+  if (status === 'Pedido saindo para entrega') return 4;
+  if (status === 'Pedido entregue') return 5;
+  if (status === 'Cancelado') return -1;
+  return 0;
+};
 
 export default function MeView({
   userCoupons,
@@ -63,9 +82,14 @@ export default function MeView({
   onRegisterWithEmail,
   onForgotPassword,
   onLogout,
-  onGoogleLogin
+  onGoogleLogin,
+  onCancelOrder,
+  onReopenPix,
+  darkMode = false,
+  onToggleDarkMode
 }: MeViewProps) {
   const [authMode, setAuthMode] = useState<'login' | 'register' | 'forgot'>('login');
+  const [orderToCancel, setOrderToCancel] = useState<any | null>(null);
   
   // Auth Form Fields
   const [loginEmail, setLoginEmail] = useState('');
@@ -238,6 +262,7 @@ export default function MeView({
               {/* Order Lists card loop */}
               {orderHistory.map((order, index) => {
                 const trackingCode = `ITB-831-${9402 + index}-AM`;
+                const statusIdx = getStatusIndex(order.status);
                 return (
                   <div 
                     key={order.id} 
@@ -251,13 +276,21 @@ export default function MeView({
                         <h3 className="text-[12.5px] font-black text-gray-900 font-mono">#{order.id}</h3>
                       </div>
 
-                      <span className={`px-2.5 py-1 rounded-full text-[9.5px] font-black uppercase tracking-wider ${
-                        order.status === 'Entregue' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' :
-                        order.status === 'A Caminho' ? 'bg-cyan-50 text-brand-blue border border-cyan-200 animate-pulse' :
-                        'bg-amber-50 text-amber-600 border border-amber-200'
-                      }`}>
-                        ● {order.status}
-                      </span>
+                      <div className="flex gap-1.5 flex-wrap justify-end">
+                        {order.cancellationRequested && (
+                          <span className="px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider bg-rose-50 text-rose-600 border border-rose-200 animate-pulse">
+                            ⚠️ Cancelando...
+                          </span>
+                        )}
+                        <span className={`px-2.5 py-1 rounded-full text-[9.5px] font-black uppercase tracking-wider ${
+                          order.status === 'Pedido entregue' || order.status === 'Entregue' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' :
+                          order.status === 'Cancelado' ? 'bg-red-50 text-red-500 border border-red-200' :
+                          order.status === 'Pedido saindo para entrega' ? 'bg-cyan-50 text-brand-blue border border-cyan-200 animate-pulse' :
+                          'bg-amber-50 text-amber-600 border border-amber-200'
+                        }`}>
+                          ● {order.status}
+                        </span>
+                      </div>
                     </div>
 
                     {/* Meta information columns */}
@@ -314,68 +347,93 @@ export default function MeView({
                     <div className="border-t border-gray-100 pt-3">
                       <h4 className="text-[10px] text-gray-400 uppercase font-black tracking-widest mb-3">Linha do Tempo de Rastreio</h4>
                       
-                      <div className="space-y-4 relative pl-4.5 border-l-2 border-brand-blue/15 ml-2.5 font-sans">
-                        
-                        {/* Step 1: Pedido Confirmado / Pago */}
-                        <div className="relative">
-                          <div className={`absolute -left-[24.5px] top-0.5 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center shadow-xs animate-fade-in ${
-                            order.status !== 'Aguardando Pagamento' ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'
-                          }`} />
-                          <div>
-                            <span className="text-[11.5px] font-black text-gray-850 block">
-                              {order.status === 'Aguardando Pagamento' ? 'Aguardando Pagamento' : 'Pedido Confirmado'}
-                            </span>
-                            <span className="text-[9.5px] text-gray-400 mt-0.5 block">
-                              {order.date} - {order.status === 'Aguardando Pagamento' ? 'Seu pagamento ainda não foi processado.' : 'Seu pedido foi recebido e confirmado.'}
-                            </span>
-                          </div>
+                      {statusIdx === -1 ? (
+                        <div className="bg-red-50/60 border border-red-200 text-red-650 font-semibold p-3.5 rounded-xl text-xs space-y-1 select-none animate-fade-in text-center font-sans">
+                          <span className="text-lg block">❌</span>
+                          <h4 className="font-extrabold text-[12px] uppercase">Este Pedido foi Cancelado</h4>
+                          <p className="text-[10.5px] text-red-500 leading-relaxed font-bold">
+                            Seu cancelamento foi processado e confirmado pelo administrador. O estorno correspondente foi emitido com sucesso.
+                          </p>
                         </div>
-
-                        {/* Step 2: Em separação / Processamento */}
-                        <div className="relative">
-                          <div className={`absolute -left-[24.5px] top-0.5 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center shadow-xs ${
-                            ['Processamento', 'Pedido sendo empacotado', 'Pedido saindo para entrega', 'Pedido entregue'].includes(order.status) 
-                              ? 'bg-emerald-500' 
-                              : order.status === 'Pendente' ? 'bg-brand-blue animate-pulse' : 'bg-gray-200'
-                          }`} />
-                          <div>
-                            <span className="text-[11.5px] font-black text-gray-850 block">Processamento e Separação</span>
-                            <span className="text-[9.5px] text-gray-400 mt-0.5 block">
-                              {order.status === 'Pedido sendo empacotado' ? 'Seu pedido está sendo cuidadosamente empacotado.' : 
-                               ['Processamento', 'Pedido sendo empacotado', 'Pedido saindo para entrega', 'Pedido entregue'].includes(order.status) ? 'Estoque verificado e itens em preparação.' : 'Aguardando início do processamento.'}
-                            </span>
+                      ) : (
+                        <div className="space-y-4 relative pl-4.5 border-l-2 border-brand-blue/15 ml-2.5 font-sans">
+                          
+                          {/* Step 1: Pendente */}
+                          <div className="relative">
+                            <div className={`absolute -left-[24.5px] top-1 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center shadow-xs ${
+                              statusIdx > 1 ? 'bg-emerald-500' :
+                              statusIdx === 1 ? 'bg-amber-500 animate-pulse' : 'bg-gray-200'
+                            }`} />
+                            <div>
+                              <span className="text-[11.5px] font-black text-gray-850 block flex items-center gap-1.5">
+                                Pendente {order.status === 'Aguardando Pagamento' && <span className="text-[9.5px] text-amber-500 bg-amber-50 border border-amber-200 px-1 rounded-sm font-semibold">Aguardando Pagamento</span>}
+                              </span>
+                              <span className="text-[9.5px] text-gray-400 mt-0.5 block leading-relaxed">
+                                {statusIdx >= 1 ? 'Seu pedido foi recebido e aguarda as confirmações padrão para o faturamento.' : 'Aguardando o registro inicial do pedido.'}
+                              </span>
+                            </div>
                           </div>
-                        </div>
 
-                        {/* Step 3: Em Rota de entrega */}
-                        <div className="relative">
-                          <div className={`absolute -left-[24.5px] top-0.5 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center shadow-xs ${
-                            ['Pedido saindo para entrega', 'Pedido entregue'].includes(order.status) ? 'bg-emerald-500' :
-                            order.status === 'Pedido saindo para entrega' ? 'bg-brand-blue animate-pulse' : 'bg-gray-200'
-                          }`} />
-                          <div>
-                            <span className="text-[11.5px] font-black text-gray-850 block">Rota de Entrega Expresso</span>
-                            <span className="text-[9.5px] text-gray-400 mt-0.5 block">
-                              {order.status === 'Pedido saindo para entrega' ? 'O entregador já saiu com seu pedido para Itacoatiara!' : 
-                               order.status === 'Pedido entregue' ? 'Entrega concluída.' : 'Aguardando saída para entrega.'}
-                            </span>
+                          {/* Step 2: Processamento */}
+                          <div className="relative">
+                            <div className={`absolute -left-[24.5px] top-1 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center shadow-xs ${
+                              statusIdx > 2 ? 'bg-emerald-500' :
+                              statusIdx === 2 ? 'bg-brand-blue animate-pulse' : 'bg-gray-200'
+                            }`} />
+                            <div>
+                              <span className="text-[11.5px] font-black text-gray-850 block">Processamento</span>
+                              <span className="text-[9.5px] text-gray-400 mt-0.5 block leading-relaxed">
+                                {statusIdx > 2 ? 'Os detalhes de saldo e estoque foram validados de forma bem-sucedida.' : 
+                                 statusIdx === 2 ? 'O administrador recebeu o seu pedido e está fazendo a verificação técnica em estoque.' : 'Aguardando faturamento completo.'}
+                              </span>
+                            </div>
                           </div>
-                        </div>
 
-                        {/* Step 4: Entregue */}
-                        <div className="relative pb-1">
-                          <div className={`absolute -left-[24.5px] top-0.5 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center shadow-xs ${
-                            order.status === 'Pedido entregue' ? 'bg-emerald-500' : 'bg-gray-200'
-                          }`} />
-                          <div>
-                            <span className="text-[11.5px] font-black text-gray-850 block">Pedido Entregue</span>
-                            <span className="text-[9.5px] text-gray-400 mt-0.5 block">
-                              {order.status === 'Pedido entregue' ? 'Finalizado - Entregue com sucesso.' : 'A confirmação final será após a entrega.'}
-                            </span>
+                          {/* Step 3: Pedido sendo empacotado */}
+                          <div className="relative">
+                            <div className={`absolute -left-[24.5px] top-1 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center shadow-xs ${
+                              statusIdx > 3 ? 'bg-emerald-500' :
+                              statusIdx === 3 ? 'bg-brand-blue animate-pulse' : 'bg-gray-200'
+                            }`} />
+                            <div>
+                              <span className="text-[11.5px] font-black text-gray-850 block">Pedido sendo empacotado</span>
+                              <span className="text-[9.5px] text-gray-400 mt-0.5 block leading-relaxed">
+                                {statusIdx > 3 ? 'Embalagem certificada ItaBuy preenchida e lacrada.' :
+                                 statusIdx === 3 ? 'Nossa expedição em Itacoatiara está separando, limpando e embalando seus produtos em caixa resistente.' : 'Aguardando empacotamento.'}
+                              </span>
+                            </div>
                           </div>
-                        </div>
 
-                      </div>
+                          {/* Step 4: Pedido saindo para entrega */}
+                          <div className="relative">
+                            <div className={`absolute -left-[24.5px] top-1 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center shadow-xs ${
+                              statusIdx > 4 ? 'bg-emerald-500' :
+                              statusIdx === 4 ? 'bg-brand-blue animate-pulse' : 'bg-gray-200'
+                            }`} />
+                            <div>
+                              <span className="text-[11.5px] font-black text-gray-850 block">Pedido saindo para entrega</span>
+                              <span className="text-[9.5px] text-gray-400 mt-0.5 block leading-relaxed">
+                                {statusIdx > 4 ? 'O transportador coletou e viajou até seu bairro.' :
+                                 statusIdx === 4 ? 'Excelente! O entregador expresso ItaBuy coletou seu pacote e está em rota para entrega no seu endereço!' : 'Aguardando despacho com o transportador.'}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Step 5: Pedido entregue */}
+                          <div className="relative pb-1">
+                            <div className={`absolute -left-[24.5px] top-1 w-3.5 h-3.5 rounded-full border-2 border-white flex items-center justify-center shadow-xs ${
+                              statusIdx === 5 ? 'bg-emerald-500' : 'bg-gray-200'
+                            }`} />
+                            <div>
+                              <span className="text-[11.5px] font-black text-gray-850 block">Pedido entregue</span>
+                              <span className="text-[9.5px] text-gray-400 mt-0.5 block leading-relaxed">
+                                {statusIdx === 5 ? 'Finalizado - Seu pacote foi entregue com todo cuidado e segurança.' : 'Aguardando confirmação de recebimento no endereço de entrega.'}
+                              </span>
+                            </div>
+                          </div>
+
+                        </div>
+                      )}
                     </div>
 
                     {/* Map pinned address placeholder */}
@@ -391,13 +449,39 @@ export default function MeView({
                       </div>
                     </div>
 
-                    {/* Help Support button regarding this order */}
-                    <button 
-                      onClick={() => alert(`Central de Rastreio: Atendimento sobre o pedido #${order.id} em canais rápidos de Itacoatiara.`)}
-                      className="w-full text-center py-2 text-[10.5px] text-brand-blue font-extrabold uppercase tracking-wide bg-blue-50/50 hover:bg-blue-50 rounded-xl transition-all border border-blue-100 outline-none"
-                    >
-                      Dúvidas sobre este pedido?
-                    </button>
+                    {/* Cancellation Actions */}
+                    <div className="space-y-2 pt-1.5 font-sans">
+                      {/* Pagar com Pix Button when pending and Pix data exists on order */}
+                      {(order.status === 'Aguardando Pagamento' || order.status === 'Pendente') && order.qr_code && order.qr_code_base64 && !order.cancellationRequested && (
+                        <button 
+                          onClick={() => {
+                            if (onReopenPix) {
+                              onReopenPix(order.id, order.total, order.qr_code, order.qr_code_base64);
+                            }
+                          }}
+                          className="w-full text-center py-2.5 text-[11px] text-white font-extrabold uppercase tracking-widest bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-sm outline-none active:scale-97 cursor-pointer select-none flex items-center justify-center gap-2"
+                        >
+                          <span className="text-[12px]">❖</span> Pagar com Pix (Reabrir Pix)
+                        </button>
+                      )}
+
+                      {order.cancellationRequested ? (
+                        <div className="w-full text-center py-2.5 text-[10px] text-amber-600 font-extrabold uppercase bg-amber-50 rounded-xl border border-amber-100 select-none animate-pulse">
+                          ⏱️ Cancelamento Solicitado / Aguardando Estorno do Admin
+                        </div>
+                      ) : order.status === 'Cancelado' ? (
+                        <div className="w-full text-center py-2.5 text-[10px] text-red-500 font-extrabold uppercase bg-red-50 rounded-xl border border-red-100 select-none">
+                          ❌ Pedido Cancelado e Estornado
+                        </div>
+                      ) : (
+                        <button 
+                          onClick={() => setOrderToCancel(order)}
+                          className="w-full text-center py-2.5 text-[10.5px] text-rose-500 font-extrabold uppercase tracking-wide bg-rose-50/50 hover:bg-rose-50 hover:text-rose-600 rounded-xl transition-all border border-rose-100 outline-none active:scale-97 cursor-pointer select-none"
+                        >
+                          Cancelamento e Reembolso
+                        </button>
+                      )}
+                    </div>
 
                   </div>
                 );
@@ -406,6 +490,52 @@ export default function MeView({
           )}
 
         </div>
+
+        {/* Cancellation Confirmation Modal specifically for detailed purchases view */}
+        {orderToCancel && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in font-sans">
+            <div className="bg-white rounded-2xl w-full max-w-sm p-5 shadow-2xl border border-gray-150 space-y-4 animate-scale-up text-center">
+              <div className="w-12 h-12 bg-red-100 text-red-650 rounded-full flex items-center justify-center mx-auto text-xl">
+                ⚠️
+              </div>
+              
+              <div className="space-y-1">
+                <h3 className="text-gray-900 font-extrabold text-sm uppercase tracking-wider">Confirmar Cancelamento</h3>
+                <p className="text-[11px] text-gray-500 leading-relaxed font-semibold font-sans">
+                  Você tem certeza que deseja cancelar e receber reembolso do pedido <strong className="font-extrabold text-gray-800">#{orderToCancel.id}</strong>?
+                </p>
+              </div>
+
+              <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3 text-left text-[10px] text-amber-750 font-bold leading-relaxed space-y-1 select-none font-sans">
+                <p>📌 <strong>Forma de pagamento:</strong> {String(orderToCancel.paymentMethod || 'não identificada').toUpperCase()}</p>
+                <p>💡 Um aviso de cancelamento imediato será enviado para o painel administrativo. O administrador confirmará a devolução e efetuará o estorno correspondente.</p>
+              </div>
+
+              <div className="flex gap-2 font-sans pt-1">
+                <button
+                  onClick={() => setOrderToCancel(null)}
+                  className="flex-1 py-2 text-xs font-bold text-gray-500 hover:text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-all active:scale-95 outline-none cursor-pointer"
+                >
+                  Voltar
+                </button>
+                <button
+                  onClick={async () => {
+                    const targetOrd = orderToCancel;
+                    setOrderToCancel(null);
+                    try {
+                      await onCancelOrder(targetOrd);
+                    } catch (err) {
+                      console.error(err);
+                    }
+                  }}
+                  className="flex-1 py-2 text-xs font-bold text-white bg-red-650 hover:bg-red-700 transition-all active:scale-95 outline-none cursor-pointer font-sans"
+                >
+                  Confirmar Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     );
@@ -709,35 +839,36 @@ export default function MeView({
 
       </section>
 
-      {/* 2. Simplified compras section (replaces legacy 4 buttons) */}
+      {/* 2. Simplified compras section (REMOVED: Now handled by separate Compras view) */}
+
+      {/* 3. Minha Conta Section */}
       <section className="mt-8 bg-white p-4 mx-2.5 rounded-2xl border border-gray-150 shadow-2xs">
-        
-        {/* Banner header row */}
-        <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-3.5">
-          <span className="flex items-center gap-1.5 text-xs text-gray-800 font-extrabold uppercase">
-            <ClipboardList className="w-5 h-5 text-brand-blue" />
-            Minhas Compras
-          </span>
-          <span className="bg-blue-50 text-brand-blue text-[9px] font-black px-2 py-0.5 rounded-full uppercase border border-blue-150">
-            Fidelidade AM
-          </span>
+        <h3 className="text-xs font-black text-gray-800 uppercase tracking-widest mb-4">Minha Conta</h3>
+        <div className="space-y-3">
+            <div className="flex items-center justify-between w-full p-3 bg-gray-50 rounded-xl text-xs font-bold text-gray-600 border border-gray-100">
+              <span>Favoritos</span>
+              <span className="bg-white px-2 py-0.5 rounded-full text-[10px] font-black">{favorites.length}</span>
+            </div>
+            
+            {/* Dark Mode toggle button */}
+            <button 
+              onClick={onToggleDarkMode}
+              className="flex items-center justify-between w-full p-3 bg-gray-50 rounded-xl text-xs font-bold text-gray-600 border border-gray-100 hover:bg-gray-100 transition-all cursor-pointer tap-highlight-transparent"
+            >
+              <div className="flex items-center gap-2">
+                {darkMode ? <Moon className="w-4.5 h-4.5 text-indigo-500 fill-indigo-50/20" /> : <Sun className="w-4.5 h-4.5 text-amber-500" />}
+                <span>Modo Escuro</span>
+              </div>
+              <div className={`w-11 h-6 rounded-full p-0.5 transition-colors duration-200 cursor-pointer ${darkMode ? 'bg-indigo-600' : 'bg-gray-200'}`}>
+                <div className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform duration-200 flex items-center justify-center ${darkMode ? 'translate-x-5' : 'translate-x-0'}`}>
+                  {darkMode ? <Moon className="w-3 h-3 text-indigo-900" /> : <Sun className="w-3 h-3 text-yellow-500" />}
+                </div>
+              </div>
+            </button>
+
+            <a href="https://www.instagram.com/itabuy.com.br/" target="_blank" className="block w-full p-3 bg-gray-50 rounded-xl text-xs font-bold text-gray-600 border border-gray-100 hover:bg-gray-100 transition-colors">Instagram da Loja</a>
+            <button onClick={handleLogout} className="w-full p-3 bg-rose-50 rounded-xl text-xs font-extrabold text-rose-600 border border-rose-100 hover:bg-rose-100 transition-colors">Sair da Conta</button>
         </div>
-
-        {/* Text of purchases and button */}
-        <div className="text-center py-2.5 px-1 space-y-3.5">
-          <p className="text-xs font-medium text-gray-500 leading-relaxed">
-            Você possui <b className="text-gray-900 font-extrabold">{orderHistory.length} compras</b> em andamento ou finalizadas registradas no aplicativo.
-          </p>
-
-          <button 
-            onClick={() => setViewingOrdersDetail(true)}
-            className="w-full py-2.5 bg-brand-blue text-white active:bg-brand-blue-hover text-xs font-black uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-95 text-center flex items-center justify-center gap-2"
-          >
-            <Truck className="w-4 h-4 text-brand-yellow shrink-0" />
-            <span>Ver Compras e Rastreio</span>
-          </button>
-        </div>
-
       </section>
 
       {/* 2.5. Favorites Row Carousel (In profile view) */}
@@ -781,24 +912,6 @@ export default function MeView({
       {/* 4. Utility List details list (Central de Ajuda & Sair) */}
       <section className="mt-3 bg-white rounded-2xl border border-gray-150 mx-2.5 overflow-hidden shadow-2xs divide-y divide-gray-100 font-sans">
         
-        {/* Help Center Item - Now configured to show "Em desenvolvimento" info */}
-        <div 
-          onClick={() => {
-            triggerToast('🚧 Central de Ajuda em Desenvolvimento.');
-          }}
-          className="p-3.5 flex items-center justify-between hover:bg-slate-50 cursor-pointer active:bg-gray-100 text-xs text-gray-700 select-none"
-        >
-          <div className="flex items-center gap-2.5">
-            <HelpCircle className="w-4.5 h-4.5 text-purple-600 animate-pulse" />
-            <div className="flex items-center gap-2 font-black">
-              <span>Central de Ajuda & Dúvidas FAQ</span>
-              <span className="text-[7.5px] bg-purple-50 border border-purple-200 text-purple-600 px-1.5 py-0.2 rounded-full uppercase mr-1">
-                Em desenvolvimento
-              </span>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-gray-400" />
-        </div>
 
         {/* Support disclaimer notice inside panel */}
         <div className="p-3.5 bg-slate-50 text-[10px] text-gray-400 font-medium leading-relaxed">
@@ -824,6 +937,52 @@ export default function MeView({
         <p>© 2026 ItaBuy Magazine Ltda.</p>
         <p className="mt-0.5 font-sans">Versão Oficial ItaBuy App v1.5.0 (Mobile Experience)</p>
       </footer>
+
+      {/* Cancellation Confirmation Modal */}
+      {orderToCancel && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in font-sans">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5 shadow-2xl border border-gray-150 space-y-4 animate-scale-up text-center">
+            <div className="w-12 h-12 bg-red-100 text-red-650 rounded-full flex items-center justify-center mx-auto text-xl">
+              ⚠️
+            </div>
+            
+            <div className="space-y-1">
+              <h3 className="text-gray-900 font-extrabold text-sm uppercase tracking-wider">Confirmar Cancelamento</h3>
+              <p className="text-[11px] text-gray-500 leading-relaxed font-semibold font-sans">
+                Você tem certeza que deseja cancelar e receber reembolso do pedido <strong className="font-extrabold text-gray-800">#{orderToCancel.id}</strong>?
+              </p>
+            </div>
+
+            <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3 text-left text-[10px] text-amber-750 font-bold leading-relaxed space-y-1 select-none font-sans">
+              <p>📌 <strong>Forma de pagamento:</strong> {String(orderToCancel.paymentMethod || 'não identificada').toUpperCase()}</p>
+              <p>💡 Um aviso de cancelamento imediato será enviado para o painel administrativo. O administrador confirmará a devolução e efetuará o estorno correspondente.</p>
+            </div>
+
+            <div className="flex gap-2 font-sans pt-1">
+              <button
+                onClick={() => setOrderToCancel(null)}
+                className="flex-1 py-2 text-xs font-bold text-gray-500 hover:text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-all active:scale-95 outline-none cursor-pointer"
+              >
+                Voltar
+              </button>
+              <button
+                onClick={async () => {
+                  const targetOrd = orderToCancel;
+                  setOrderToCancel(null);
+                  try {
+                    await onCancelOrder(targetOrd);
+                  } catch (err) {
+                    console.error(err);
+                  }
+                }}
+                className="flex-1 py-2 text-xs font-bold text-white bg-red-650 hover:bg-red-700 transition-all active:scale-95 outline-none cursor-pointer font-sans"
+              >
+                Confirmar Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

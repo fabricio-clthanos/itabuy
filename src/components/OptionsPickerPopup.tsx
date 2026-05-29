@@ -28,6 +28,7 @@ export default function OptionsPickerPopup({ product, onConfirm, onCancel }: Opt
         initial={{ y: "100%" }}
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
         className="relative bg-white w-full max-w-md rounded-t-[2rem] sm:rounded-[2rem] overflow-hidden flex flex-col shadow-2xl"
       >
         <div className="p-6 border-b border-gray-100 flex justify-between items-center">

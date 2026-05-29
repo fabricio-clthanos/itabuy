@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Home as HomeIcon, ShoppingCart as CartIcon, User as UserIcon, 
+  Home as HomeIcon, ShoppingCart as CartIcon, User as UserIcon, Package,
   Sparkles, Check, ChevronRight, X, Smartphone, Tv, Shirt, 
   Sparkles as SparklesIcon, Footprints, Home as HomeIcon2, 
   Dumbbell, Gamepad2, Compass, Trophy, Loader2
@@ -10,8 +10,10 @@ import { Product, CartItem, Coupon } from './types';
 import Header from './components/Header';
 import HomeView from './components/HomeView';
 import ProductDetailView from './components/ProductDetailView';
+import SearchView from './components/SearchView';
 import CartView from './components/CartView';
 import MeView from './components/MeView';
+import MyPurchasesView from './components/MyPurchasesView';
 import SorteiosView from './components/SorteiosView';
 import FlashDealsView from './components/FlashDealsView';
 import CategoryView from './components/CategoryView';
@@ -44,14 +46,45 @@ import {
   getDocFromServer
 } from 'firebase/firestore';
 
+// Helper to dynamically get host URL for separate deployments (like Vercel)
+const getApiBaseUrl = () => {
+  const rawBaseUrl = import.meta.env.VITE_API_URL || '';
+  const cleanUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
+  
+  // If the target URL contains "run.app", it belongs to the temporary platform container.
+  // Direct cross-origin calls to the platform preview host (run.app) will fail with CORS / security blocks.
+  // We MUST use relative paths ('') on both our local/Cloud Run environments and Vercel environments
+  // to ensure same-origin requests succeed natively.
+  if (cleanUrl.includes('run.app')) {
+    return '';
+  }
+  
+  return cleanUrl;
+};
+
 export default function App() {
   // Database catalog & coupons state
   const [products, setProducts] = useState<Product[]>([]);
   const [availableCoupons, setAvailableCoupons] = useState<Coupon[]>([]);
   const [isLoadingDB, setIsLoadingDB] = useState(true);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [backToast, setBackToast] = useState(false);
+  const lastBackTime = useRef(0);
+  const isPopState = useRef(false);
+
+  // Dark Mode State with local storage sync
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem('theme_dark_mode') === 'true';
+  });
+
+  const handleToggleDarkMode = () => {
+    const newMode = !darkMode;
+    setDarkMode(newMode);
+    localStorage.setItem('theme_dark_mode', String(newMode));
+  };
 
   // Navigation
-  const [currentView, setCurrentView] = useState<'home' | 'product' | 'cart' | 'me' | 'sorteios' | 'flash_deals' | 'category' | 'admin'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'product' | 'cart' | 'me' | 'sorteios' | 'flash_deals' | 'category' | 'admin' | 'compras' | 'search'>('home');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
@@ -78,6 +111,36 @@ export default function App() {
       return updated;
     });
   };
+
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      isPopState.current = true;
+      if (e.state && e.state.view) {
+        setCurrentView(e.state.view);
+      } else if (currentView === 'home') {
+        const now = Date.now();
+        if (now - lastBackTime.current < 2000) {
+          // Let it exit
+        } else {
+          lastBackTime.current = now;
+          setBackToast(true);
+          setTimeout(() => setBackToast(false), 2000);
+          // Prevent exit
+          history.pushState({ view: 'home' }, '');
+        }
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [currentView]);
+
+  useEffect(() => {
+    if (isPopState.current) {
+      isPopState.current = false;
+      return;
+    }
+    history.pushState({ view: currentView }, '');
+  }, [currentView]);
 
   // Scroll to extreme top when entering product detail or switching modes
   useEffect(() => {
@@ -140,35 +203,72 @@ export default function App() {
   // Safe Add To Cart logic with Specs checks
   const [firebaseUser, setFirebaseUser] = useState<any | null>(null);
 
+  // General UI & Elementor settings
+  const [storeSettings, setStoreSettings] = useState<any>({
+    headerLogoUrl: 'https://i.ibb.co/bjjh6VkK/Ita-Magazine-1.png',
+    headerShowSearch: true,
+    headerPromotag: '⚡ Entregamos no mesmo dia em Itacoatiara - AM',
+    headerBannerBg: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=800&q=80'
+  });
+  const [inspectMode, setInspectMode] = useState(false);
+
   // Strictly load live production data from Firestore.
   // No mock fallbacks are allowed, obeying the user's intent to remove all non-fixed test data.
   useEffect(() => {
-    const loadStoreContent = async () => {
-      try {
-        // Load products collection
-        const prodSnap = await getDocs(collection(db, 'products'));
-        const prodList: Product[] = [];
-        prodSnap.forEach((doc) => {
-          prodList.push({ id: doc.id, ...doc.data() } as Product);
-        });
-        setProducts(prodList);
+    // Listen to products live updates
+    const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
+      const prodList: Product[] = [];
+      snapshot.forEach((doc) => {
+        prodList.push({ id: doc.id, ...doc.data() } as Product);
+      });
+      setProducts(prodList);
+      setIsLoadingDB(false);
+    }, (error) => {
+      console.error("Firestore loading error for products:", error);
+      handleFirestoreError(error, OperationType.GET, 'products');
+    });
 
-        // Load coupons collection
-        const coupSnap = await getDocs(collection(db, 'coupons'));
-        const coupList: Coupon[] = [];
-        coupSnap.forEach((doc) => {
-          coupList.push({ id: doc.id, ...doc.data() } as Coupon);
-        });
-        setAvailableCoupons(coupList);
-        setIsLoadingDB(false);
-      } catch (error) {
-        console.error("Firestore database integration loading error:", error);
-        handleFirestoreError(error, OperationType.GET, 'products');
-        setIsLoadingDB(false);
+    // Listen to coupons live updates
+    const unsubCoupons = onSnapshot(collection(db, 'coupons'), (snapshot) => {
+      const coupList: Coupon[] = [];
+      snapshot.forEach((doc) => {
+        coupList.push({ id: doc.id, ...doc.data() } as Coupon);
+      });
+      setAvailableCoupons(coupList);
+    }, (error) => {
+      console.error("Firestore loading error for coupons:", error);
+      handleFirestoreError(error, OperationType.GET, 'coupons');
+    });
+
+    // Live Elementor Settings from Firestore
+    const unsubSettings = onSnapshot(doc(db, 'settings', 'elementor'), (docSnap) => {
+      if (docSnap.exists()) {
+        setStoreSettings((prev: any) => ({ ...prev, ...docSnap.data() }));
       }
-    };
+    });
 
-    loadStoreContent();
+    return () => {
+      unsubProducts();
+      unsubCoupons();
+      unsubSettings();
+    };
+  }, []);
+
+  // Listen to Window message for live preview from Elementor Builder
+  useEffect(() => {
+    const isPreview = window.location.search.includes('preview=true');
+    if (isPreview) {
+      const handleMessage = (event: MessageEvent) => {
+        if (event.data?.type === 'ELEMENTOR_PREVIEW') {
+          const { key, value } = event.data.payload;
+          setStoreSettings((prev: any) => ({ ...prev, [key]: value }));
+        } else if (event.data?.type === 'ELEMENTOR_INSPECT_MODE') {
+          setInspectMode(event.data.payload.active);
+        }
+      };
+      window.addEventListener('message', handleMessage);
+      return () => window.removeEventListener('message', handleMessage);
+    }
   }, []);
 
   // Sync state cleanly, wiping local residual values to obey user intent
@@ -189,9 +289,11 @@ export default function App() {
   // Listen to Firestore changes and Authentication state
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fUser) => {
+      const isPreview = window.location.search.includes('preview=true');
+
       if (fUser) {
         setFirebaseUser(fUser);
-        if (fUser.email === 'adminbuy22@gmail.com') {
+        if (fUser.email === 'adminbuy22@gmail.com' && !isPreview) {
           setCurrentView('admin');
         }
         
@@ -476,6 +578,9 @@ export default function App() {
       return;
     }
 
+    if (isCheckingOut) return;
+    setIsCheckingOut(true);
+
     // Enrich address with user info
     address.fullname = firebaseUser.displayName || 'Cliente ItaBuy';
     address.email = firebaseUser.email || '';
@@ -528,8 +633,7 @@ export default function App() {
     try {
       // If it's PIX, create payment on Mercado Pago
       if (paymentMethod === 'pix') {
-        const rawBaseUrl = import.meta.env.VITE_API_URL || '';
-        const baseUrl = rawBaseUrl.endsWith('/') ? rawBaseUrl.slice(0, -1) : rawBaseUrl;
+        const baseUrl = getApiBaseUrl();
         const response = await fetch(`${baseUrl}/api/create-pix`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -569,10 +673,12 @@ export default function App() {
         const mpData = await response.json();
         
         // ONLY write to Firestore if PIX was successfully generated
-        // Enrich order with Mercado Pago ID
+        // Enrich order with Mercado Pago ID and QR Code payload
         const orderWithMP = {
           ...newOrder,
-          mercadoPagoId: mpData.id?.toString()
+          mercadoPagoId: mpData.id?.toString(),
+          qr_code: mpData.point_of_interaction.transaction_data.qr_code,
+          qr_code_base64: mpData.point_of_interaction.transaction_data.qr_code_base64
         };
         await setDoc(doc(db, 'orders', generatedOrderId), orderWithMP);
 
@@ -629,6 +735,8 @@ export default function App() {
         userMsg = 'Erro de Conexão (API): A variável VITE_API_URL no Vercel não foi configurada ou aponta para uma URL privada. Configure-a com a URL Pública (Shared App URL) do Cloud Run do AI Studio.';
       }
       showToast(userMsg);
+    } finally {
+      setIsCheckingOut(false);
     }
   };
 
@@ -643,6 +751,53 @@ export default function App() {
       showToast('Histórico excluído do banco de dados.');
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, 'orders');
+    }
+  };
+
+  // Cancellation and Refund process trigger
+  const handleRequestCancellation = async (order: any) => {
+    if (!firebaseUser) return;
+    try {
+      // 1. Create/update a cancellation request document in Firestore collection 'cancellations'
+      const cancellationRef = doc(db, 'cancellations', order.id);
+      await setDoc(cancellationRef, {
+        orderId: order.id,
+        userId: firebaseUser.uid,
+        userName: firebaseUser.displayName || mappedUser?.name || 'Cliente ItaBuy',
+        userEmail: firebaseUser.email || mappedUser?.email || '',
+        total: order.total,
+        paymentMethod: order.paymentMethod || 'não informado',
+        itemsCount: order.itemsCount || 1,
+        items: order.items || [],
+        address: order.address || {},
+        status: 'Pendente',
+        timestamp: Date.now(),
+        date: new Date().toLocaleDateString('pt-BR')
+      });
+
+      // 2. We also flag the order itself with cancellationRequested: true
+      const orderRef = doc(db, 'orders', order.id);
+      await setDoc(orderRef, {
+        cancellationRequested: true,
+        cancellationStatus: 'Pendente'
+      }, { merge: true });
+
+      // 3. Create an admin notification inside Firestore
+      const notificationRef = doc(db, 'notifications', `cancel-${order.id}`);
+      await setDoc(notificationRef, {
+        id: `cancel-${order.id}`,
+        title: 'Nova Solicitação de Cancelamento',
+        message: `O cliente ${firebaseUser.displayName || mappedUser?.name || 'ItaBuy'} solicitou cancelamento do pedido #${order.id} (R$ ${order.total.toFixed(2)})`,
+        type: 'cancellation',
+        orderId: order.id,
+        timestamp: Date.now(),
+        read: false
+      });
+
+      showToast('Solicitação de cancelamento enviada ao administrador! 🚀');
+    } catch (error: any) {
+      console.error("Cancellation Error in App:", error);
+      showToast('Erro ao solicitar cancelamento: ' + error.message);
     }
   };
 
@@ -674,14 +829,49 @@ export default function App() {
   } : null;
 
   return (
-    <div className={currentView === 'admin' ? "min-h-screen w-screen" : "min-h-screen bg-slate-900 flex justify-center items-stretch font-sans text-gray-800 antialiased overflow-x-hidden md:p-4"}>
+    <div className={currentView === 'admin' ? "min-h-screen w-screen" : "min-h-screen bg-[#ebebeb] flex justify-center items-stretch font-sans text-gray-800 antialiased overflow-x-hidden md:p-4"}>
       {currentView === 'admin' ? (
         <AdminDashboard onLogout={handleLogout} />
       ) : (
-        <div className="w-full max-w-md bg-white flex flex-col min-h-screen shadow-2xl relative overflow-hidden md:rounded-2xl border border-gray-150 relative">
+        <div 
+          className={`w-full max-w-md ${darkMode ? 'dark-theme-wrapper' : 'bg-white'} flex flex-col min-h-screen shadow-sm relative overflow-hidden md:rounded-none border ${inspectMode ? 'border-amber-500 border-4 cursor-crosshair' : 'border-gray-200 relative'}`}
+          onClickCapture={(e) => {
+            if (inspectMode) {
+              e.preventDefault();
+              e.stopPropagation();
+              let target = e.target as HTMLElement;
+              let sectionId = 'home';
+              
+              if (target.closest('header')) {
+                sectionId = 'header';
+              } else if (target.closest('#footer') || target.closest('footer')) {
+                sectionId = 'footer';
+              } else {
+                sectionId = 'home';
+              }
+              
+              window.parent.postMessage({ type: 'ELEMENTOR_INSPECT_RESULT', payload: { sectionId } }, '*');
+              setInspectMode(false);
+            }
+          }}
+        >
           
-          {/* 1. Header Toolbar Component (Hidden for standalone product, category, or flash deals page) */}
-          {currentView !== 'product' && currentView !== 'category' && currentView !== 'flash_deals' && (
+          {/* Toast for exit */}
+          <AnimatePresence>
+            {backToast && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                className="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-4 py-2 rounded-full text-xs font-bold z-50 pointer-events-none"
+              >
+                Pressione voltar novamente para sair
+              </motion.div>
+            )}
+          </AnimatePresence>
+          
+          {/* 1. Header Toolbar Component (Hidden for standalone product, category, flash deals, or search page) */}
+          {currentView !== 'product' && currentView !== 'category' && currentView !== 'flash_deals' && currentView !== 'search' && (
             <Header 
               currentView={currentView}
               onNavigate={(view) => {
@@ -697,6 +887,12 @@ export default function App() {
                 if (activeCategoryFilter) setActiveCategoryFilter('');
               }}
               cartCount={cartTotalBadge}
+              storeSettings={storeSettings}
+              products={products}
+              onSearchSubmit={(q) => {
+                setSearchQuery(q);
+                setCurrentView('search');
+              }}
             />
           )}
 
@@ -717,18 +913,46 @@ export default function App() {
             )}
 
             {currentView === 'home' && (
-              <HomeView 
-                products={categoryProducts}
-                onSelectProduct={(p) => {
-                  setSelectedProduct(p);
-                  setCurrentView('product');
-                }}
-                onSelectCoupon={handleClaimCoupon}
-                searchQuery={searchQuery}
-                onNavigateToCategory={handleNavigateToCategory}
-                onNavigateToFlashDeals={() => setCurrentView('flash_deals')}
-                availableCoupons={availableCoupons}
-              />
+              <>
+                {/* Moving Instagram Ticker Banner */}
+                <a 
+                  href="https://www.instagram.com/itabuy.com.br/" 
+                  target="_blank" 
+                  rel="noreferrer"
+                  className="block bg-gradient-to-r from-[#d6249f] via-[#fd5949] to-[#fccc63] text-white py-2 overflow-hidden select-none cursor-pointer border-b border-gray-100 shrink-0 shadow-sm"
+                >
+                  <div className="w-full overflow-hidden flex">
+                    <div className="animate-marquee flex gap-12 text-[10px] font-black uppercase tracking-widest text-white whitespace-nowrap">
+                      {/* Repeated phrases to span larger than screen width */}
+                      <span>👉 Segue a gente no Insta e participe de sorteios: @itabuy.com.br 🎁</span>
+                      <span>👉 Segue a gente no Insta e participe de sorteios: @itabuy.com.br 🎁</span>
+                      <span>👉 Segue a gente no Insta e participe de sorteios: @itabuy.com.br 🎁</span>
+                      <span>👉 Segue a gente no Insta e participe de sorteios: @itabuy.com.br 🎁</span>
+                      
+                      {/* Identical cloned items for a perfect seamless infinite loop */}
+                      <span>👉 Segue a gente no Insta e participe de sorteios: @itabuy.com.br 🎁</span>
+                      <span>👉 Segue a gente no Insta e participe de sorteios: @itabuy.com.br 🎁</span>
+                      <span>👉 Segue a gente no Insta e participe de sorteios: @itabuy.com.br 🎁</span>
+                      <span>👉 Segue a gente no Insta e participe de sorteios: @itabuy.com.br 🎁</span>
+                    </div>
+                  </div>
+                </a>
+
+                <HomeView 
+                  products={categoryProducts}
+                  onSelectProduct={(p) => {
+                    setSelectedProduct(p);
+                    setCurrentView('product');
+                  }}
+                  onSelectCoupon={handleClaimCoupon}
+                  searchQuery={searchQuery}
+                  onNavigateToCategory={handleNavigateToCategory}
+                  onNavigateToFlashDeals={() => setCurrentView('flash_deals')}
+                  availableCoupons={availableCoupons}
+                  storeSettings={storeSettings}
+                  inspectMode={inspectMode}
+                />
+              </>
             )}
 
             {currentView === 'product' && selectedProduct && (
@@ -742,24 +966,49 @@ export default function App() {
                 isFavorite={favorites.some((fav) => fav.id === selectedProduct.id)}
                 onToggleFavorite={handleToggleFavorite}
                 onSelectProduct={(p) => setSelectedProduct(p)}
+                onViewCart={() => setCurrentView('cart')}
               />
             )}
 
-            {currentView === 'cart' && (
-              <CartView 
-                cartItems={cart}
-                onUpdateQuantity={handleUpdateCartQuantity}
-                onRemoveItem={handleRemoveCartItem}
-                onToggleSelectItem={handleToggleSelectItem}
-                onToggleSelectAll={handleToggleSelectAll}
-                coupons={claimedCoupons}
-                onCheckout={handleCheckout}
-                favorites={favorites}
+            {currentView === 'search' && (
+              <SearchView 
+                products={products}
+                initialQuery={searchQuery}
                 onSelectProduct={(p) => {
                   setSelectedProduct(p);
                   setCurrentView('product');
                 }}
+                onBack={() => {
+                  setCurrentView('home');
+                  setSearchQuery('');
+                }}
+                categoriesList={storeSettings?.categories}
               />
+            )}
+
+            {currentView === 'cart' && (
+              firebaseUser ? (
+                <CartView 
+                  cartItems={cart}
+                  onUpdateQuantity={handleUpdateCartQuantity}
+                  onRemoveItem={handleRemoveCartItem}
+                  onToggleSelectItem={handleToggleSelectItem}
+                  onToggleSelectAll={handleToggleSelectAll}
+                  coupons={claimedCoupons}
+                  onCheckout={handleCheckout}
+                  isCheckingOut={isCheckingOut}
+                  favorites={favorites}
+                  onSelectProduct={(p) => {
+                    setSelectedProduct(p);
+                    setCurrentView('product');
+                  }}
+                />
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                    <p className="text-sm text-gray-600 mb-4">Você precisa estar logado para acessar seu carrinho.</p>
+                    <button onClick={() => setCurrentView('me')} className="bg-brand-blue text-white px-6 py-2 rounded-xl text-xs font-black">Ir para Login</button>
+                </div>
+              )
             )}
 
             {currentView === 'me' && (
@@ -779,7 +1028,34 @@ export default function App() {
                 onForgotPassword={handleForgotPassword}
                 onLogout={handleLogout}
                 onGoogleLogin={handleGoogleLogin}
+                onCancelOrder={handleRequestCancellation}
+                onReopenPix={(orderId, total, qr_code, qr_code_base64) => {
+                  setPixPaymentData({
+                    orderId,
+                    total,
+                    qr_code,
+                    qr_code_base64
+                  });
+                }}
+                darkMode={darkMode}
+                onToggleDarkMode={handleToggleDarkMode}
               />
+            )}
+
+            {currentView === 'compras' && (
+              firebaseUser ? (
+                <MyPurchasesView
+                  orderHistory={orderHistory}
+                  onCancelOrder={handleRequestCancellation}
+                  onShowToast={showToast}
+                  onBack={() => setCurrentView('me')}
+                />
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                    <p className="text-sm text-gray-600 mb-4">Você precisa estar logado para acessar seus pedidos.</p>
+                    <button onClick={() => setCurrentView('me')} className="bg-brand-blue text-white px-6 py-2 rounded-xl text-xs font-black">Ir para Login</button>
+                </div>
+              )
             )}
 
             {currentView === 'sorteios' && (
@@ -817,7 +1093,7 @@ export default function App() {
           </main>
 
           {/* 3. Shopee-styled Fixed Navigation Bar at the absolute mobile bottom */}
-          <nav className="fixed bottom-0 z-40 w-full max-w-md bg-white border-t border-gray-150 px-2 flex items-center justify-around h-15 shadow-inner" style={{ transform: 'translateX(-1px)' }}>
+          <nav id="footer" className="fixed bottom-0 z-40 w-full max-w-md bg-gradient-to-r from-brand-blue via-indigo-900 to-brand-blue border-t border-white/10 px-2 flex items-center justify-around h-16 shadow-2xl rounded-t-2xl" style={{ transform: 'translateX(-1px)' }}>
             
             <button 
               onClick={() => {
@@ -826,46 +1102,49 @@ export default function App() {
                 setActiveCategoryFilter('');
                 setSearchQuery('');
               }}
-              className={`flex-1 flex flex-col items-center justify-center p-1.5 transition-colors relative tap-highlight-transparent ${currentView === 'home' ? 'text-brand-blue font-bold' : 'text-gray-400 font-medium hover:text-gray-600'}`}
+              className={`flex-1 flex flex-col items-center justify-center p-1.5 transition-colors duration-200 relative h-full tap-highlight-transparent ${currentView === 'home' ? 'text-brand-yellow font-black' : 'text-blue-200/60 font-medium hover:text-white'}`}
             >
-              <HomeIcon className="w-5 h-5 mb-0.5" />
-              <span className="text-[10px]">Início</span>
+              {currentView === 'home' && (
+                <motion.div 
+                  layoutId="activeTabPill" 
+                  className="absolute inset-[6px] bg-white/10 border border-white/15 rounded-xl -z-10" 
+                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                />
+              )}
+              <HomeIcon className="w-5 h-5 mb-0.5 relative z-10" />
+              <span className="text-[10px] uppercase font-bold relative z-10">Início</span>
             </button>
 
+            {/* Minhas Compras Tab */}
             <button 
-              onClick={() => {
-                setCurrentView('sorteios');
-                setSelectedProduct(null);
-              }}
-              className={`flex-1 flex flex-col items-center justify-center p-1.5 transition-colors relative tap-highlight-transparent ${currentView === 'sorteios' ? 'text-brand-blue font-bold' : 'text-gray-400 font-medium hover:text-gray-600'}`}
+              onClick={() => setCurrentView('compras')}
+              className={`flex-1 flex flex-col items-center justify-center p-1.5 transition-colors duration-200 relative h-full tap-highlight-transparent ${currentView === 'compras' ? 'text-brand-yellow font-black' : 'text-blue-200/60 font-medium hover:text-white'}`}
             >
-              <Trophy className="w-5 h-5 mb-0.5" />
-              <span className="text-[10px]">Sorteios</span>
+              {currentView === 'compras' && (
+                <motion.div 
+                  layoutId="activeTabPill" 
+                  className="absolute inset-[6px] bg-white/10 border border-white/15 rounded-xl -z-10" 
+                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                />
+              )}
+              <Package className="w-5 h-5 mb-0.5 relative z-10" />
+              <span className="text-[10px] uppercase font-bold relative z-10">Compras</span>
             </button>
 
-            {/* Cart Tab button */}
-            <button 
-              onClick={() => setCurrentView('cart')}
-              className={`flex-1 flex flex-col items-center justify-center p-1.5 transition-colors relative tap-highlight-transparent ${currentView === 'cart' ? 'text-brand-blue font-bold' : 'text-gray-400 font-medium hover:text-gray-600'}`}
-            >
-              <div className="relative">
-                <CartIcon className="w-5 h-5 mb-0.5" />
-                {cartTotalBadge > 0 && (
-                  <span className="absolute -top-1.5 -right-2.5 bg-brand-yellow text-brand-blue font-black text-[9px] min-w-[14px] h-[14px] rounded-full flex items-center justify-center border border-white">
-                    {cartTotalBadge}
-                  </span>
-                )}
-              </div>
-              <span className="text-[10px]">Carrinho</span>
-            </button>
-
-            {/* Profile tab button */}
+            {/* Minha Conta Tab */}
             <button 
               onClick={() => setCurrentView('me')}
-              className={`flex-1 flex flex-col items-center justify-center p-1.5 transition-colors relative tap-highlight-transparent ${currentView === 'me' ? 'text-brand-blue font-bold' : 'text-gray-400 font-medium hover:text-gray-600'}`}
+              className={`flex-1 flex flex-col items-center justify-center p-1.5 transition-colors duration-200 relative h-full tap-highlight-transparent ${currentView === 'me' ? 'text-brand-yellow font-black' : 'text-blue-200/60 font-medium hover:text-white'}`}
             >
-              <UserIcon className="w-5 h-5 mb-0.5" />
-              <span className="text-[10px]">Eu</span>
+              {currentView === 'me' && (
+                <motion.div 
+                  layoutId="activeTabPill" 
+                  className="absolute inset-[6px] bg-white/10 border border-white/15 rounded-xl -z-10" 
+                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                />
+              )}
+              <UserIcon className="w-5 h-5 mb-0.5 relative z-10" />
+              <span className="text-[10px] uppercase font-bold relative z-10">Conta</span>
             </button>
 
           </nav>
@@ -944,7 +1223,7 @@ export default function App() {
                   <button
                     onClick={() => {
                       setCheckoutSuccessModal({ opened: false, orderId: '', total: 0, method: 'pix', address: '', needsChange: false, changeAmount: '' });
-                      setCurrentView('me');
+                      setCurrentView('compras');
                     }}
                     className="w-full bg-transparent border border-gray-250 text-gray-550 active:bg-gray-100 hover:border-gray-400 mt-3 font-semibold text-xs py-2 rounded-md text-gray-600 transition-all active:scale-95"
                   >
@@ -983,12 +1262,12 @@ export default function App() {
               }}
               onSuccess={() => {
                 setPixPaymentData(null);
-                setCurrentView('me');
+                setCurrentView('compras');
                 showToast('Pagamento confirmado! 🚀');
               }}
               onClose={() => {
                 setPixPaymentData(null);
-                setCurrentView('me'); // Redirect to Me view to see the pending order
+                setCurrentView('compras'); // Redirect to Compras view to see the pending order
                 showToast('Pedido reservado! Pague para confirmar.');
               }}
             />

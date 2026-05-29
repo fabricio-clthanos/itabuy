@@ -1,10 +1,10 @@
 import { useState, TouchEvent, MouseEvent } from 'react';
 import { 
-  Star, ShoppingCart, Truck, ChevronRight, Award, Heart,
-  ZoomIn, ZoomOut, RotateCcw, X, Compass
+  ShoppingCart, Truck, ChevronRight, Heart,
+  ZoomIn, ZoomOut, RotateCcw, X, Compass, Share2
 } from 'lucide-react';
 import { Product, Coupon } from '../types';
-import { REVIEWS, PRODUCTS } from '../data/mockData';
+import { PRODUCTS } from '../data/mockData';
 import ProductCard from './ProductCard';
 
 interface ProductDetailViewProps {
@@ -17,6 +17,7 @@ interface ProductDetailViewProps {
   isFavorite?: boolean;
   onToggleFavorite?: (product: Product) => void;
   onSelectProduct?: (product: Product) => void;
+  onViewCart?: () => void;
 }
 
 export default function ProductDetailView({
@@ -28,7 +29,8 @@ export default function ProductDetailView({
   onClaimCoupon,
   isFavorite = false,
   onToggleFavorite,
-  onSelectProduct
+  onSelectProduct,
+  onViewCart
 }: ProductDetailViewProps) {
   // Image selection state
   const [activeImgIndex, setActiveImgIndex] = useState(0);
@@ -162,16 +164,50 @@ export default function ProductDetailView({
           </svg>
         </button>
 
-        {/* Favorite Heart Toggle overlay button (Right) */}
-        {onToggleFavorite && (
+        {/* Floating actions overlay buttons (Right) */}
+        <div className="absolute top-3 right-3 flex items-center gap-2 z-20 select-none">
+          {/* Share Button */}
           <button 
-            onClick={() => onToggleFavorite(product)}
-            className="absolute top-3 right-3 bg-white text-rose-500 p-2.5 rounded-full shadow-md backdrop-blur-xs active:scale-90 transition-transform z-20"
-            aria-label="Favoritar"
+            onClick={() => {
+              if (navigator.share) {
+                navigator.share({
+                  title: product.name,
+                  text: `Confira este produto incrível: ${product.name}`,
+                  url: window.location.href,
+                }).catch(err => console.log(err));
+              } else {
+                navigator.clipboard.writeText(window.location.href);
+                alert('Link do produto copiado com sucesso!');
+              }
+            }}
+            className="bg-white text-gray-700 p-2.5 rounded-full shadow-md active:scale-90 transition-transform flex items-center justify-center hover:bg-slate-50 cursor-pointer"
+            title="Compartilhar"
           >
-            <Heart className={`w-5.5 h-5.5 ${isFavorite ? 'fill-rose-500' : ''}`} />
+            <Share2 className="w-5 h-5" />
           </button>
-        )}
+
+          {/* View Cart Button */}
+          {onViewCart && (
+            <button 
+              onClick={onViewCart}
+              className="bg-white text-gray-700 p-2.5 rounded-full shadow-md active:scale-90 transition-transform flex items-center justify-center hover:bg-slate-50 cursor-pointer"
+              title="Ver Carrinho"
+            >
+              <ShoppingCart className="w-5 h-5" />
+            </button>
+          )}
+
+          {/* Favorite Toggle */}
+          {onToggleFavorite && (
+            <button 
+              onClick={() => onToggleFavorite(product)}
+              className="bg-white text-rose-500 p-2.5 rounded-full shadow-md active:scale-90 transition-transform flex items-center justify-center hover:bg-slate-50 cursor-pointer"
+              aria-label="Favoritar"
+            >
+              <Heart className={`w-5.5 h-5.5 ${isFavorite ? 'fill-rose-500' : ''}`} />
+            </button>
+          )}
+        </div>
 
         {/* Images Indicator Counter Badge */}
         <div className="absolute bottom-3 right-3 bg-black/60 text-white text-[11px] font-semibold px-2.5 py-0.5 rounded-full z-20">
@@ -220,33 +256,6 @@ export default function ProductDetailView({
         <h1 className="text-gray-900 text-sm font-bold leading-relaxed mb-3">
           {product.name}
         </h1>
-
-        {/* Social stats & Proof lines */}
-        <div className="flex items-center gap-3 text-xs text-gray-500 pt-3 border-t border-gray-100 flex-wrap">
-          <div className="flex items-center gap-0.5">
-            <span className="font-bold text-gray-800 text-[13px]">{(product.rating || 0).toFixed(1)}</span>
-            <div className="flex text-brand-yellow">
-              {[...Array(5)].map((_, i) => (
-                <Star 
-                  key={i} 
-                  className={`w-3.5 h-3.5 ${i < Math.floor(product.rating) ? 'fill-current' : 'text-gray-200'}`} 
-                />
-              ))}
-            </div>
-          </div>
-
-          <div className="h-3 w-[1px] bg-gray-200" />
-
-          <div>
-            <span className="text-gray-800 font-semibold">124</span> Avaliações
-          </div>
-
-          <div className="h-3 w-[1px] bg-gray-200" />
-
-          <div>
-            <span className="text-gray-800 font-semibold">{product.salesCount}</span> Vendidos
-          </div>
-        </div>
       </div>
 
       {/* 3. Shipping Options detail panel */}
@@ -267,16 +276,6 @@ export default function ProductDetailView({
             </div>
           </div>
           <ChevronRight className="w-4 h-4 text-brand-blue" />
-        </div>
-
-        <div className="h-[1px] bg-gray-100" />
-
-        <div className="flex justify-between items-center text-gray-600">
-          <div className="flex items-center gap-1.5">
-            <span>🛡️</span>
-            <span>Garantia de Devolução ItaBuy de 7 dias gratuito</span>
-          </div>
-          <ChevronRight className="w-4 h-4 text-gray-400" />
         </div>
       </div>
 
@@ -365,92 +364,21 @@ export default function ProductDetailView({
         </div>
       )}
 
-      {/* 6. Product Description & Specs Tabs */}
+      {/* 6. Product Description Tab */}
       <div className="bg-white px-3 mt-2 border-y border-gray-200">
-        <div className="flex border-b border-gray-100 items-center">
-          <button 
-            onClick={() => setActiveTab('desc')}
-            className={`px-4 py-3.5 text-xs font-black transition-all border-b-2 ${activeTab === 'desc' ? 'border-brand-blue text-brand-blue' : 'border-transparent text-gray-400'}`}
-          >
-            DESCRIÇÃO
-          </button>
-          <button 
-            onClick={() => setActiveTab('specs')}
-            className={`px-4 py-3.5 text-xs font-black transition-all border-b-2 ${activeTab === 'specs' ? 'border-brand-blue text-brand-blue' : 'border-transparent text-gray-400'}`}
-          >
-            ESPECIFICAÇÕES
-          </button>
-        </div>
-
         <div className="py-4">
-          {activeTab === 'desc' ? (
-            <>
-              <p className={`text-xs text-gray-700 leading-relaxed font-normal whitespace-pre-line ${descExpanded ? '' : 'line-clamp-4'}`}>
-                {product.description}
-              </p>
-              {product.description.length > 100 && (
-                <button
-                  onClick={() => setDescExpanded(!descExpanded)}
-                  className="w-full text-center text-brand-blue text-xs font-extrabold py-2 mt-2 select-none active:scale-98"
-                >
-                  {descExpanded ? 'Ver Menos ▲' : 'Ver Descrição Completa ▼'}
-                </button>
-              )}
-            </>
-          ) : (
-            <div className="space-y-3">
-              {product.specs && Object.keys(product.specs).length > 0 ? (
-                Object.entries(product.specs).map(([key, value]) => (
-                  <div key={key} className="flex justify-between items-center py-2.5 border-b border-gray-50 last:border-0">
-                    <span className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">{key}</span>
-                    <span className="text-[11px] text-gray-800 font-black text-right ml-4">{value}</span>
-                  </div>
-                ))
-              ) : (
-                <div className="py-6 text-center">
-                  <Compass className="w-10 h-10 text-gray-100 mx-auto mb-2" />
-                  <p className="text-[10px] text-gray-300 font-bold uppercase">Sem especificações técnicas detalhadas.</p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 7. Shopee Customer reviews block */}
-      <div className="bg-white px-3 py-3.5 mt-2 border-y border-gray-200">
-        <div className="flex justify-between items-center mb-3">
-          <h3 className="text-xs font-bold text-gray-500 uppercase">
-            AVALIAÇÕES DE COMPRADORES (124)
-          </h3>
-          <span className="text-xs text-brand-blue font-bold flex items-center">
-            99% Satisfeitos <Award className="w-3.5 h-3.5 ml-0.5 text-amber-500" />
-          </span>
-        </div>
-
-        <div className="flex flex-col gap-3.5 divide-y divide-gray-100">
-          {REVIEWS.map((rev) => (
-            <div key={rev.id} className="pt-3 first:pt-0">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-gray-800">{rev.author}</span>
-                <span className="text-[10px] text-gray-400">{rev.date}</span>
-              </div>
-
-              <div className="flex text-brand-yellow my-1">
-                {[...Array(rev.rating)].map((_, i) => (
-                  <Star key={i} className="w-3 h-3 fill-current" />
-                ))}
-              </div>
-
-              <span className="text-[9.5px] text-gray-400 bg-gray-50 px-1 py-0.5 rounded-xs">
-                {rev.spec}
-              </span>
-
-              <p className="text-xs text-gray-700 mt-1.5 font-normal leading-relaxed">
-                {rev.comment}
-              </p>
-            </div>
-          ))}
+            <h3 className="text-xs font-black text-gray-800 uppercase tracking-widest mb-2">Descrição</h3>
+            <p className={`text-xs text-gray-700 leading-relaxed font-normal whitespace-pre-line ${descExpanded ? '' : 'line-clamp-4'}`}>
+              {product.description}
+            </p>
+            {product.description.length > 100 && (
+              <button
+                onClick={() => setDescExpanded(!descExpanded)}
+                className="w-full text-center text-brand-blue text-xs font-extrabold py-2 mt-2 select-none active:scale-98"
+              >
+                {descExpanded ? 'Ver Menos ▲' : 'Ver Descrição Completa ▼'}
+              </button>
+            )}
         </div>
       </div>
 
