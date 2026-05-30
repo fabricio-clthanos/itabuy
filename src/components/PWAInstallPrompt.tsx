@@ -12,33 +12,32 @@ export default function PWAInstallPrompt() {
       e.preventDefault();
       // Store the event so it can be triggered later
       setDeferredPrompt(e);
-      // Logic to show our custom prompt after a short delay
-      const hasShown = localStorage.getItem('itabuy_install_prompt_shown');
-      if (!hasShown) {
-        setTimeout(() => setShowPrompt(true), 3000);
-      }
+      // Show immediately
+      setShowPrompt(true);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    // Fallback for testing or if the event already fired
-    // Check if the app is already installed
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
     
     if (!isStandalone) {
+       // Show immediately on first mount for all devices
        const hasShown = localStorage.getItem('itabuy_install_prompt_shown');
-       if (!hasShown) {
-          // If we can't capture the event yet, we still show a "how to install" or just wait
-        }
+       if (!hasShown || isIOS) { // Always show on iOS for better visibility if not standalone
+          setShowPrompt(true);
+       }
     }
 
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+
   const handleInstallClick = async () => {
-    if (!deferredPrompt) {
-      // If prompt is not available, alert the user on how to install manually
-      alert("Para instalar\n\n1. Toque no ícone de compartilhamento (iPhone) ou no menu de 3 pontos (Android)\n2. Selecione 'Adicionar à Tela de Início'");
+    if (isIOS || !deferredPrompt) {
+      // If prompt is not available (like on iOS), guide the user on how to install manually
+      alert("Para instalar no seu iPhone:\n\n1. Toque no ícone de 'Compartilhar' (o quadrado com seta para cima)\n2. Role para baixo e selecione 'Adicionar à Tela de Início'\n3. Toque em 'Adicionar' no canto superior.");
       setShowPrompt(false);
       localStorage.setItem('itabuy_install_prompt_shown', 'true');
       return;

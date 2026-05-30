@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Ticket } from 'lucide-react';
 import { Product, Coupon } from '../types';
 import { CATEGORIES } from '../data/mockData';
 import ProductCard from './ProductCard';
@@ -173,75 +172,59 @@ export default function HomeView({
           ) : (
             <>
               {/* BANNERS LIST */}
-          {banners.filter(b => b.isActive).map((banner: any) => (
-            <div 
-              key={banner.id} 
-              onClick={() => {
-                if (banner.clickable) {
-                  if (banner.targetType === 'category') {
-                    onNavigateToCategory(banner.targetValue);
-                  } else if (banner.targetType === 'page') {
-                    onNavigateToPage(banner.targetValue);
-                  }
-                }
-              }}
-              className={`w-[88%] flex-shrink-0 relative group snap-center ${banner.clickable ? 'cursor-pointer active:scale-[0.98] transition-transform' : ''}`}
-            >
-               <img src={banner.imageUrl} alt={banner.name} className="w-full h-36 object-cover rounded-xl shadow-md border border-gray-100" />
-               {banner.clickable && (
-                 <div className="absolute bottom-2 right-2 bg-white/20 backdrop-blur-md p-1.5 rounded-full text-white">
-                   <Ticket size={14} className="rotate-45" />
-                 </div>
-               )}
-            </div>
-          ))}
+              {banners.filter(b => b.isActive).map((banner: any) => (
+                <div 
+                  key={banner.id} 
+                  onClick={() => {
+                    if (banner.clickable) {
+                      if (banner.targetType === 'category') {
+                        onNavigateToCategory(banner.targetValue);
+                      } else if (banner.targetType === 'page') {
+                        onNavigateToPage(banner.targetValue);
+                      }
+                    }
+                  }}
+                  className={`w-[88%] flex-shrink-0 relative group snap-center ${banner.clickable ? 'cursor-pointer active:scale-[0.98] transition-transform' : ''}`}
+                >
+                  <img src={banner.imageUrl} alt={banner.name} className="w-full h-36 object-cover rounded-xl shadow-md border border-gray-100" />
+                </div>
+              ))}
 
-          {/* COUPONS LIST INTEGRATED */}
-          {availableCoupons.map((coupon) => (
-            <div 
-              key={coupon.id} 
-              className="bg-white border-2 border-brand-blue/10 rounded-xl flex overflow-hidden flex-shrink-0 w-[88%] snap-center shadow-md select-none h-36"
-            >
-              <div className="bg-brand-blue text-white px-4 flex flex-col items-center justify-center shrink-0 border-r border-dashed border-white/20">
-                <span className="text-sm font-black text-brand-yellow uppercase tracking-tighter">Ita</span>
-                <Ticket size={18} />
-                <span className="text-[8px] font-bold mt-1 opacity-80">CUPOM</span>
-              </div>
-
-              <div className="p-4 flex-1 flex flex-col justify-between">
-                <div>
-                  <h4 className="text-[13px] font-black text-slate-800 line-clamp-1 uppercase leading-tight">
-                    {coupon.title}
-                  </h4>
-                  <div className="mt-1 flex items-center gap-1.5">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Código:</span>
-                    <span className="text-[11px] font-black text-brand-blue bg-blue-50 px-1.5 py-0.5 rounded italic">
-                      {coupon.code}
-                    </span>
+              {/* PREMIUM VOUCHER REDESIGN */}
+              {availableCoupons.map((coupon) => (
+                <div 
+                  key={coupon.id} 
+                  className="bg-white rounded-xl flex overflow-hidden flex-shrink-0 w-[88%] snap-center shadow-sm select-none h-32 border border-slate-100 relative group"
+                >
+                  <div className="w-1.5 h-full bg-slate-900 shrink-0" />
+                  <div className="p-4 flex-1 flex flex-col justify-between">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="text-[13px] font-black text-slate-800 tracking-tight uppercase leading-none">{coupon.title}</h4>
+                        <div className="mt-2 flex items-center gap-1.5">
+                          <code className="text-[10px] font-black text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-100 font-mono">{coupon.code}</code>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-slate-900 font-extrabold text-lg leading-none">{coupon.type === 'percentage' ? `${coupon.discount}%` : `R$ ${coupon.discount}`}</div>
+                        <span className="text-[9px] font-black text-slate-400">OFF</span>
+                      </div>
+                    </div>
+                    <div className="flex items-end justify-between mt-auto">
+                      <div className="flex flex-col">
+                        <span className="text-[8px] text-slate-400 font-bold uppercase">Mínimo: R${coupon.minSpent}</span>
+                      </div>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); onSelectCoupon(coupon); }}
+                        className="bg-slate-900 text-white text-[9px] font-black px-6 py-2.5 rounded-lg uppercase"
+                      >
+                        Resgatar
+                      </button>
+                    </div>
                   </div>
                 </div>
-
-                <div className="flex items-center justify-between mt-auto">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase w-fit">
-                      -{coupon.type === 'percentage' ? `${coupon.discount}%` : `R$ ${coupon.discount}`} OFF
-                    </span>
-                    <span className="text-[8.5px] text-slate-300 font-bold mt-1">Válido para hoje</span>
-                  </div>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelectCoupon(coupon);
-                    }}
-                    className="bg-slate-900 hover:bg-black text-white active:bg-brand-blue-hover text-[10px] font-black px-4 py-2 rounded-lg uppercase active:scale-95 transition-all shadow-sm"
-                  >
-                    COPIAR
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-          </>
+              ))}
+            </>
           )}
         </div>
       </section>

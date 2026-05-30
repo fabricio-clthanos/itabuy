@@ -23,8 +23,10 @@
     "lucide-react": "^0.546.0",
     "mercadopago": "^3.0.0",
     "motion": "^12.23.24",
+    "prop-types": "^15.8.1",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
+    "react-quick-pinch-zoom": "^5.1.1",
     "vite": "^6.2.3"
   },
   "devDependencies": {

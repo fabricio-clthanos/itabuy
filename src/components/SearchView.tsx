@@ -121,7 +121,7 @@ export default function SearchView({
   };
 
   return (
-    <div className="flex-grow bg-[#ebebeb] pb-24 font-sans select-none min-h-screen">
+    <div className="flex-grow bg-[#ebebeb] pb-32 font-sans select-none min-h-screen">
       
       {/* 1. Dedicated SearchView Header */}
       <header className="bg-[#0005c7] text-white py-3.5 px-3 sticky top-0 z-45 shadow-sm border-b border-black/10">
@@ -269,16 +269,7 @@ export default function SearchView({
           </div>
 
           {/* Quick options */}
-          <div className="flex items-center justify-between pt-1 border-t border-gray-50">
-            <label className="flex items-center gap-2 text-xs font-bold text-gray-650 cursor-pointer select-none">
-              <input 
-                type="checkbox"
-                checked={freeShippingOnly}
-                onChange={(e) => { setFreeShippingOnly(e.target.checked); setCurrentPage(1); }}
-                className="rounded-none border-gray-300 w-4 h-4 text-brand-blue focus:ring-0 cursor-pointer"
-              />
-              <span>Apenas com Frete Grátis 🚚</span>
-            </label>
+          <div className="flex items-center justify-end pt-1 border-t border-gray-50">
             <div className="text-[10px] text-brand-blue font-extrabold bg-blue-50 px-2 py-0.5 border border-blue-100 rounded-none">
               ItaBuy Oficial
             </div>
@@ -348,11 +339,6 @@ export default function SearchView({
                       <span className="text-sm font-semibold text-gray-950 leading-none">
                         R$ {(product.price || 0).toFixed(2)}
                       </span>
-                      {product.freeShipping && (
-                        <span className="text-[9px] text-emerald-600 font-extrabold tracking-wide uppercase">
-                          Frete Grátis
-                        </span>
-                      )}
                     </div>
 
                     {/* Pix discount details */}

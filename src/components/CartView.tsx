@@ -29,41 +29,6 @@ interface CartViewProps {
   onSelectProduct?: (product: Product) => void;
 }
 
-function TypingHeader({ onComplete }: { onComplete: () => void }) {
-  const text = "carrinho →";
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      onComplete();
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, [onComplete]);
-
-  return (
-    <motion.div
-      key="typing-internal"
-      initial={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 1.5, ease: "easeInOut" }}
-      className="flex items-center justify-center pointer-events-none"
-    >
-      <div className="flex">
-        {text.split('').map((char, index) => (
-          <motion.span
-            key={index}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: index * 0.1, duration: 0.1 }}
-            className="text-brand-blue font-black text-2xl uppercase tracking-[0.2em]"
-          >
-            {char === ' ' ? '\u00A0' : char}
-          </motion.span>
-        ))}
-      </div>
-    </motion.div>
-  );
-}
-
 export default function CartView({
   cartItems,
   onUpdateQuantity,
@@ -74,8 +39,6 @@ export default function CartView({
   onCheckout,
   isCheckingOut = false
 }: CartViewProps) {
-  const [showTyping, setShowTyping] = useState(true);
-  
   // Coupon state applied
   const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null);
 
@@ -145,30 +108,23 @@ export default function CartView({
   };
 
   return (
-    <div className="flex-grow bg-[#FAFAFA] min-h-screen pb-36 font-sans select-none">
+    <div className="flex-grow bg-[#FAFAFA] min-h-screen pb-52 font-sans select-none">
       
-      {/* Centered Modern Header - Larger and Animated */}
-      <div className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 h-32 sticky top-0 z-30 shadow-sm flex items-center justify-center overflow-hidden">
-        <AnimatePresence mode="wait">
-          {showTyping ? (
-            <TypingHeader onComplete={() => setShowTyping(false)} />
-          ) : (
-            <motion.div 
-              key="icon"
-              initial={{ scale: 0.5, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ 
-                type: "spring",
-                stiffness: 260,
-                damping: 20,
-                duration: 0.6 
-              }}
-              className="flex flex-col items-center"
-            >
-              <ShoppingBag className="w-14 h-14 text-brand-blue" />
-            </motion.div>
-          )}
-        </AnimatePresence>
+      {/* Centered Modern Header - Larger and Static */}
+      <div className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 h-24 sticky top-0 z-30 shadow-sm flex items-center justify-center overflow-hidden">
+        <motion.div 
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ 
+            type: "spring",
+            stiffness: 260,
+            damping: 20,
+            duration: 0.6 
+          }}
+          className="flex flex-col items-center"
+        >
+          <ShoppingBag className="w-10 h-10 text-brand-blue" />
+        </motion.div>
       </div>
 
       {cartItems.length === 0 ? (
@@ -428,7 +384,7 @@ export default function CartView({
           </div>
 
           {/* Bottom Summary Glass Bar */}
-          <div className="fixed bottom-14 left-0 right-0 z-40 bg-white/80 backdrop-blur-md border-t border-gray-200/60 shadow-sm">
+          <div className="fixed bottom-20 left-0 right-0 z-40 bg-white/80 backdrop-blur-md border-t border-gray-200/60 shadow-sm">
             <div className="mx-auto max-w-md h-[4.5rem] px-4 flex items-center justify-between">
               <div className="flex flex-col">
                 <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wide">Total</span>

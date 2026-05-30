@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Home as HomeIcon, ShoppingCart as CartIcon, User as UserIcon, Package,
+  Home as HomeIcon, ShoppingCart as CartIcon, User as UserIcon, Package, Search,
   Sparkles, Check, ChevronRight, X, Smartphone, Tv, Shirt, 
   Sparkles as SparklesIcon, Footprints, Home as HomeIcon2, 
   Dumbbell, Gamepad2, Compass, Trophy, Loader2
@@ -212,14 +212,34 @@ export default function App() {
   // General UI & Elementor settings
   const [storeSettings, setStoreSettings] = useState<any>({
     headerLogoUrl: 'https://i.ibb.co/bjjh6VkK/Ita-Magazine-1.png',
-    headerShowSearch: true,
+    headerShowSearch: false,
     headerPromotag: '⚡ Entregamos no mesmo dia em Itacoatiara - AM',
     headerBannerBg: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=800&q=80'
   });
   const [inspectMode, setInspectMode] = useState(false);
 
   // Strictly load live production data from Firestore.
-  // No mock fallbacks are allowed, obeying the user's intent to remove all non-fixed test data.
+  const [smartProducts, setSmartProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    if (products && products.length > 0) {
+      // Secret Intelligence Logic: Rotate and Recommend based on behavior
+      const favIds = (favorites || []).map(f => f.id);
+      const cartIds = (cart || []).map(c => c.product.id);
+      
+      const prioritized = [...products].sort((a, b) => {
+        const scoreA = (favIds.includes(a.id) ? 15 : 0) + (cartIds.includes(a.id) ? 10 : 0) + (a.salesCount || 0) * 0.1;
+        const scoreB = (favIds.includes(b.id) ? 15 : 0) + (cartIds.includes(b.id) ? 10 : 0) + (b.salesCount || 0) * 0.1;
+        return scoreB - scoreA;
+      });
+
+      // Rotating Logic: Every time this triggers (on nav to home), we reshuffle the top picks
+      const shuffled = prioritized.slice(0, 20).sort(() => Math.random() - 0.5);
+      const combined = [...shuffled, ...prioritized.slice(20)];
+      setSmartProducts(combined);
+    }
+  }, [products, (favorites || []).length, (cart || []).length, currentView === 'home']);
+
   useEffect(() => {
     // Listen to products live updates
     const unsubProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
@@ -913,7 +933,7 @@ export default function App() {
           )}
 
           {/* 2. Main Content View Router switcher */}
-          <main className="flex-1 flex flex-col overflow-y-auto no-scrollbar pb-16">
+          <main className="flex-1 flex flex-col overflow-y-auto no-scrollbar pb-32">
             
             {/* Active Category Filter Header feedback if selected */}
             {activeCategoryFilter && (
@@ -955,7 +975,7 @@ export default function App() {
                 </a>
 
                 <HomeView 
-                  products={categoryProducts}
+                  products={smartProducts.length > 0 ? smartProducts : categoryProducts}
                   onSelectProduct={(p) => {
                     setSelectedProduct(p);
                     setCurrentView('product');
@@ -977,6 +997,7 @@ export default function App() {
             {currentView === 'product' && selectedProduct && (
               <ProductDetailView 
                 product={selectedProduct}
+                allProducts={products}
                 onAddToCart={handleAddToCart}
                 onBuyNow={handleBuyNow}
                 onBack={() => setCurrentView('home')}
@@ -1119,8 +1140,10 @@ export default function App() {
 
           </main>
 
-          {/* 3. Shopee-styled Fixed Navigation Bar at the absolute mobile bottom */}
-          <nav id="footer" className="fixed bottom-0 z-40 w-full max-w-md bg-gradient-to-r from-brand-blue via-indigo-900 to-brand-blue border-t border-white/10 px-2 flex items-center justify-around h-16 shadow-2xl rounded-t-2xl" style={{ transform: 'translateX(-1px)' }}>
+          {/* 3. Refined Modern Navigation Bar - Restored Cart and added special border */}
+          <nav id="footer" className="fixed bottom-0 z-40 w-full max-w-md bg-white/95 backdrop-blur-xl flex items-center justify-around h-20 px-2 shadow-[0_-10px_30px_-15px_rgba(0,0,0,0.08)] rounded-t-[1.8rem] safe-area-bottom">
+            {/* The Special Top Border Line - "Somente até encostar na lateral" */}
+            <div className="absolute top-0 left-8 right-8 h-[1px] bg-slate-200" />
             
             <button 
               onClick={() => {
@@ -1128,50 +1151,82 @@ export default function App() {
                 setSelectedProduct(null);
                 setActiveCategoryFilter('');
                 setSearchQuery('');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className={`flex-1 flex flex-col items-center justify-center p-1.5 transition-colors duration-200 relative h-full tap-highlight-transparent ${currentView === 'home' ? 'text-brand-yellow font-black' : 'text-blue-200/60 font-medium hover:text-white'}`}
+              className={`flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-300 relative h-full active:scale-90 ${currentView === 'home' ? 'text-brand-blue' : 'text-gray-400 hover:text-gray-600'}`}
             >
-              {currentView === 'home' && (
-                <motion.div 
-                  layoutId="activeTabPill" 
-                  className="absolute inset-[6px] bg-white/10 border border-white/15 rounded-xl -z-10" 
-                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                />
-              )}
-              <HomeIcon className="w-5 h-5 mb-0.5 relative z-10" />
-              <span className="text-[10px] uppercase font-bold relative z-10">Início</span>
+              <div className="relative">
+                <HomeIcon className={`w-6 h-6 transition-transform duration-300 ${currentView === 'home' ? 'scale-110 drop-shadow-[0_0_8px_rgba(0,102,255,0.3)]' : ''}`} />
+                {currentView === 'home' && (
+                  <motion.div 
+                    layoutId="activeDot"
+                    className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-brand-blue rounded-full"
+                  />
+                )}
+              </div>
+              <span className={`text-[10px] font-bold tracking-tight transition-colors duration-300 ${currentView === 'home' ? 'text-brand-blue' : 'text-gray-400'}`}>Início</span>
             </button>
 
-            {/* Minhas Compras Tab */}
+            <button 
+              onClick={() => setCurrentView('search')}
+              className={`flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-300 relative h-full active:scale-90 ${currentView === 'search' ? 'text-brand-blue' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              <div className="relative">
+                <Search className={`w-6 h-6 transition-transform duration-300 ${currentView === 'search' ? 'scale-110 drop-shadow-[0_0_8px_rgba(0,102,255,0.3)]' : ''}`} />
+                {currentView === 'search' && (
+                  <motion.div 
+                    layoutId="activeDot"
+                    className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-brand-blue rounded-full"
+                  />
+                )}
+              </div>
+              <span className={`text-[10px] font-bold tracking-tight transition-colors duration-300 ${currentView === 'search' ? 'text-brand-blue' : 'text-gray-400'}`}>Buscar</span>
+            </button>
+
+            <button 
+              onClick={() => setCurrentView('cart')}
+              className="flex-1 flex flex-col items-center justify-center transition-all duration-300 relative h-full active:scale-90"
+            >
+              <div className="relative z-10 p-4 bg-brand-yellow/80 backdrop-blur-md rounded-full shadow-lg border-2 border-white/50 -translate-y-1">
+                <CartIcon className="w-7 h-7 text-slate-900" />
+                {cartTotalBadge > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[9px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-sm animate-in zoom-in duration-300">
+                    {cartTotalBadge}
+                  </span>
+                )}
+              </div>
+            </button>
+
             <button 
               onClick={() => setCurrentView('compras')}
-              className={`flex-1 flex flex-col items-center justify-center p-1.5 transition-colors duration-200 relative h-full tap-highlight-transparent ${currentView === 'compras' ? 'text-brand-yellow font-black' : 'text-blue-200/60 font-medium hover:text-white'}`}
+              className={`flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-300 relative h-full active:scale-90 ${currentView === 'compras' ? 'text-brand-blue' : 'text-gray-400 hover:text-gray-600'}`}
             >
-              {currentView === 'compras' && (
-                <motion.div 
-                  layoutId="activeTabPill" 
-                  className="absolute inset-[6px] bg-white/10 border border-white/15 rounded-xl -z-10" 
-                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                />
-              )}
-              <Package className="w-5 h-5 mb-0.5 relative z-10" />
-              <span className="text-[10px] uppercase font-bold relative z-10">Compras</span>
+              <div className="relative">
+                <Package className={`w-6 h-6 transition-transform duration-300 ${currentView === 'compras' ? 'scale-110 drop-shadow-[0_0_8px_rgba(0,102,255,0.3)]' : ''}`} />
+                {currentView === 'compras' && (
+                  <motion.div 
+                    layoutId="activeDot"
+                    className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-brand-blue rounded-full"
+                  />
+                )}
+              </div>
+              <span className={`text-[10px] font-bold tracking-tight transition-colors duration-300 ${currentView === 'compras' ? 'text-brand-blue' : 'text-gray-400'}`}>Compras</span>
             </button>
 
-            {/* Minha Conta Tab */}
             <button 
               onClick={() => setCurrentView('me')}
-              className={`flex-1 flex flex-col items-center justify-center p-1.5 transition-colors duration-200 relative h-full tap-highlight-transparent ${currentView === 'me' ? 'text-brand-yellow font-black' : 'text-blue-200/60 font-medium hover:text-white'}`}
+              className={`flex-1 flex flex-col items-center justify-center gap-1 transition-all duration-300 relative h-full active:scale-90 ${currentView === 'me' ? 'text-brand-blue' : 'text-gray-400 hover:text-gray-600'}`}
             >
-              {currentView === 'me' && (
-                <motion.div 
-                  layoutId="activeTabPill" 
-                  className="absolute inset-[6px] bg-white/10 border border-white/15 rounded-xl -z-10" 
-                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                />
-              )}
-              <UserIcon className="w-5 h-5 mb-0.5 relative z-10" />
-              <span className="text-[10px] uppercase font-bold relative z-10">Conta</span>
+              <div className="relative">
+                <UserIcon className={`w-6 h-6 transition-transform duration-300 ${currentView === 'me' ? 'scale-110 drop-shadow-[0_0_8px_rgba(0,102,255,0.3)]' : ''}`} />
+                {currentView === 'me' && (
+                  <motion.div 
+                    layoutId="activeDot"
+                    className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-brand-blue rounded-full"
+                  />
+                )}
+              </div>
+              <span className={`text-[10px] font-bold tracking-tight transition-colors duration-300 ${currentView === 'me' ? 'text-brand-blue' : 'text-gray-400'}`}>Perfil</span>
             </button>
 
           </nav>
