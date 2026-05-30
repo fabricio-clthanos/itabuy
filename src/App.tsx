@@ -21,6 +21,7 @@ import FlashDealsView from './components/FlashDealsView';
 import AdminDashboard from './components/AdminDashboard';
 import OptionsPickerPopup from './components/OptionsPickerPopup';
 import CheckoutPixPopup from './components/CheckoutPixPopup';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
 
 // Firebase core imports
 import { auth, db } from './lib/firebase';
@@ -1298,6 +1299,7 @@ export default function App() {
               }}
             />
           )}
+          <PWAInstallPrompt />
         </div>
       )}
     </div>
