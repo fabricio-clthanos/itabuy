@@ -40,6 +40,22 @@ export interface Coupon {
   expiry: string;
 }
 
+export interface Banner {
+  id: string;
+  name: string;
+  imageUrl: string;
+  isActive: boolean;
+  clickable: boolean;
+  targetType: 'category' | 'page';
+  targetValue: string; // If category -> id/name, If page -> pageId
+}
+
+export interface Page {
+  id: string;
+  name: string;
+  content: string; // HTML content
+}
+
 export interface Review {
   id: string;
   author: string;

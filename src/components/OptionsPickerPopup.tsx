@@ -46,7 +46,7 @@ export default function OptionsPickerPopup({ product, onConfirm, onCancel }: Opt
             <img src={product.images[0]} className="w-16 h-16 rounded-xl object-cover border border-gray-100" />
             <div>
               <p className="font-bold text-gray-900 line-clamp-1">{product.name}</p>
-              <p className="text-indigo-600 font-black">R$ {product.price.toFixed(2)}</p>
+              <p className="text-indigo-600 font-black">R$ {(product.price || 0).toFixed(2)}</p>
             </div>
           </div>
 

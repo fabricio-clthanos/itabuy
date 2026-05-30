@@ -6,9 +6,10 @@ import {
 import { Product, Coupon } from '../types';
 import { PRODUCTS } from '../data/mockData';
 import ProductCard from './ProductCard';
+import { ProductDetailsSkeleton } from './Skeleton';
 
 interface ProductDetailViewProps {
-  product: Product;
+  product: Product | null;
   onAddToCart: (item: Product, spec: { [key: string]: string }) => void;
   onBuyNow: (item: Product, spec: { [key: string]: string }) => void;
   onBack: () => void;
@@ -18,6 +19,7 @@ interface ProductDetailViewProps {
   onToggleFavorite?: (product: Product) => void;
   onSelectProduct?: (product: Product) => void;
   onViewCart?: () => void;
+  loading?: boolean;
 }
 
 export default function ProductDetailView({
@@ -30,7 +32,8 @@ export default function ProductDetailView({
   isFavorite = false,
   onToggleFavorite,
   onSelectProduct,
-  onViewCart
+  onViewCart,
+  loading
 }: ProductDetailViewProps) {
   // Image selection state
   const [activeImgIndex, setActiveImgIndex] = useState(0);
@@ -44,6 +47,18 @@ export default function ProductDetailView({
 
   // Touch coordinates for image swipe gestures
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
+
+  if (loading || !product) {
+    return (
+      <div className="flex-grow bg-[#F5F5F5] pb-24 font-sans min-h-screen">
+         <header className="bg-brand-blue text-white py-3.5 px-4 sticky top-0 z-40 flex items-center gap-3">
+           <button onClick={onBack} className="p-2 rounded-full bg-white/10"><X size={20} /></button>
+           <div className="h-4 w-32 bg-white/20 rounded animate-pulse" />
+         </header>
+         <ProductDetailsSkeleton />
+      </div>
+    );
+  }
 
   // Drag-to-pan implementation inside zoom modal
   const handleDragStart = (e: MouseEvent<HTMLDivElement> | TouchEvent<HTMLDivElement>) => {
@@ -246,10 +261,18 @@ export default function ProductDetailView({
         </div>
 
         {/* Pricing Layout */}
-        <div className="flex items-baseline gap-0.5 text-brand-blue mb-1.5">
-          <span className="text-sm font-bold">R$</span>
-          <span className="text-2xl font-black">{Math.floor(product.price || 0)}</span>
-          <span className="text-base font-bold">,{(((product.price || 0) % 1) * 100).toFixed(0).padStart(2, '0')}</span>
+        <div className="space-y-1 mb-3">
+          <div className="flex items-baseline gap-0.5 text-brand-blue">
+            <span className="text-sm font-bold">R$</span>
+            <span className="text-2xl font-black">{Math.floor(product.price || 0)}</span>
+            <span className="text-base font-bold">,{(((product.price || 0) % 1) * 100).toFixed(0).padStart(2, '0').slice(0, 2)}</span>
+          </div>
+          
+          <div className="flex items-center gap-1.5 text-emerald-600 bg-emerald-50 w-fit px-2 py-0.5 rounded-md">
+            <span className="text-[10px] font-black uppercase">no pix:</span>
+            <span className="text-sm font-black">R$ {((product.price || 0) * 0.9).toFixed(2)}</span>
+            <span className="text-[9px] font-bold text-emerald-500/80">(10% de desconto)</span>
+          </div>
         </div>
 
         {/* Title */}

@@ -3,6 +3,7 @@ import { Ticket } from 'lucide-react';
 import { Product, Coupon } from '../types';
 import { CATEGORIES } from '../data/mockData';
 import ProductCard from './ProductCard';
+import { ProductCardSkeleton, BannerSkeleton } from './Skeleton';
 
 interface HomeViewProps {
   products: Product[];
@@ -10,10 +11,13 @@ interface HomeViewProps {
   onSelectCoupon: (coupon: Coupon) => void;
   searchQuery: string;
   onNavigateToCategory: (categoryId: string) => void;
+  onNavigateToPage: (pageId: string) => void;
   onNavigateToFlashDeals: () => void;
   availableCoupons: Coupon[];
+  banners: any[];
   storeSettings?: any;
   inspectMode?: boolean;
+  loading?: boolean;
 }
 
 export default function HomeView({
@@ -22,16 +26,21 @@ export default function HomeView({
   onSelectCoupon,
   searchQuery,
   onNavigateToCategory,
+  onNavigateToPage,
   onNavigateToFlashDeals,
   availableCoupons,
+  banners,
   storeSettings,
-  inspectMode
+  inspectMode,
+  loading
 }: HomeViewProps) {
-  const defaultSections = ['coupons', 'products'];
+  const defaultSections = ['banners', 'products'];
   const layoutOrder = storeSettings?.homeLayout || defaultSections;
   
-  // Filter only the allowed sections array
-  const activeLayout = layoutOrder.filter((id: string) => ['coupons', 'products'].includes(id));
+  // Ensure 'banners' is always first, followed by other selected sections
+  const sectionsToInclude = ['banners', 'products'];
+  const baseLayout = layoutOrder.filter((id: string) => sectionsToInclude.includes(id));
+  const activeLayout = ['banners', ...baseLayout.filter(id => id !== 'banners')];
 
   // Determine top horizontal tabs for Categories matching new catalog request
   // First is "Para você", then actual categories
@@ -42,7 +51,12 @@ export default function HomeView({
   const filteredProductsBySearch = products.filter((p) => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
-    return p.name.toLowerCase().includes(query) || (p.category || '').toLowerCase().includes(query) || p.description.toLowerCase().includes(query);
+    const name = p.name || '';
+    const category = p.category || '';
+    const description = p.description || '';
+    return name.toLowerCase().includes(query) || 
+           category.toLowerCase().includes(query) || 
+           description.toLowerCase().includes(query);
   });
 
   const displayedProducts = filteredProductsBySearch.filter((p) => {
@@ -50,7 +64,7 @@ export default function HomeView({
     
     // Find category in settings or catalog
     const cats = storeSettings?.categories || CATEGORIES || [];
-    const activeCat = cats.find((c: any) => (c.name || '').toLowerCase() === selectedSubTab.toLowerCase());
+    const activeCat = cats.find((c: any) => (c.name || '').toLowerCase() === (selectedSubTab || '').toLowerCase());
     
     const prodCat = (p.category || '').toLowerCase();
     
@@ -60,7 +74,7 @@ export default function HomeView({
     }
     
     // Fallback simple comparison if category tab not found in CATEGORIES list
-    return prodCat === selectedSubTab.toLowerCase();
+    return prodCat === (selectedSubTab || '').toLowerCase();
   });
 
   const handleDragStart = (e: any, id: string) => {
@@ -148,53 +162,90 @@ export default function HomeView({
       </section>
     ), storeSettings?.homeShowCategories ?? true),
 
-    coupons: wrapSection('coupons', (
-      <section id="cupons-secao" className="mt-2 bg-gradient-to-r from-blue-50 to-indigo-50 p-3 border-y border-gray-200">
-        <div className="flex items-center gap-1.5 mb-2">
-          <Ticket className="w-4 h-4 text-brand-blue" />
-          <h3 className="text-[11px] font-bold text-gray-600 uppercase tracking-widest">
-            Cupons de Desconto ItaBuy
-          </h3>
-        </div>
+    banners: wrapSection('banners', (
+      <section id="banners-secao" className="mt-2">
+        <div className="flex gap-3 overflow-x-auto px-3 no-scrollbar ios-scroll-inertia snap-x snap-mandatory">
+          {loading ? (
+            <>
+              <div className="w-[88%] shrink-0"><BannerSkeleton /></div>
+              <div className="w-[88%] shrink-0"><BannerSkeleton /></div>
+            </>
+          ) : (
+            <>
+              {/* BANNERS LIST */}
+          {banners.filter(b => b.isActive).map((banner: any) => (
+            <div 
+              key={banner.id} 
+              onClick={() => {
+                if (banner.clickable) {
+                  if (banner.targetType === 'category') {
+                    onNavigateToCategory(banner.targetValue);
+                  } else if (banner.targetType === 'page') {
+                    onNavigateToPage(banner.targetValue);
+                  }
+                }
+              }}
+              className={`w-[88%] flex-shrink-0 relative group snap-center ${banner.clickable ? 'cursor-pointer active:scale-[0.98] transition-transform' : ''}`}
+            >
+               <img src={banner.imageUrl} alt={banner.name} className="w-full h-36 object-cover rounded-xl shadow-md border border-gray-100" />
+               {banner.clickable && (
+                 <div className="absolute bottom-2 right-2 bg-white/20 backdrop-blur-md p-1.5 rounded-full text-white">
+                   <Ticket size={14} className="rotate-45" />
+                 </div>
+               )}
+            </div>
+          ))}
 
-        <div className="flex gap-3 overflow-x-auto pb-1 no-scrollbar ios-scroll-inertia">
+          {/* COUPONS LIST INTEGRATED */}
           {availableCoupons.map((coupon) => (
             <div 
               key={coupon.id} 
-              className="bg-white border border-brand-blue/30 rounded-lg flex overflow-hidden flex-shrink-0 w-[240px] shadow-sm select-none"
+              className="bg-white border-2 border-brand-blue/10 rounded-xl flex overflow-hidden flex-shrink-0 w-[88%] snap-center shadow-md select-none h-36"
             >
-              <div className="bg-brand-blue text-white px-2.5 flex flex-col items-center justify-center shrink-0 border-r border-dashed border-gray-200">
-                <span className="text-lg font-black text-brand-yellow">Ita</span>
-                <span className="text-[8px] font-bold">CUPOM</span>
+              <div className="bg-brand-blue text-white px-4 flex flex-col items-center justify-center shrink-0 border-r border-dashed border-white/20">
+                <span className="text-sm font-black text-brand-yellow uppercase tracking-tighter">Ita</span>
+                <Ticket size={18} />
+                <span className="text-[8px] font-bold mt-1 opacity-80">CUPOM</span>
               </div>
 
-              <div className="p-2.5 flex-1 flex flex-col justify-between">
+              <div className="p-4 flex-1 flex flex-col justify-between">
                 <div>
-                  <h4 className="text-[11px] font-extrabold text-gray-800 line-clamp-1 leading-tight">
+                  <h4 className="text-[13px] font-black text-slate-800 line-clamp-1 uppercase leading-tight">
                     {coupon.title}
                   </h4>
-                  <span className="text-[9px] text-gray-600">
-                    Ped. Min: R${coupon.minSpent}
-                  </span>
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Código:</span>
+                    <span className="text-[11px] font-black text-brand-blue bg-blue-50 px-1.5 py-0.5 rounded italic">
+                      {coupon.code}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-[9px] text-gray-405 text-gray-400 bg-gray-100 px-1 py-0.5 rounded-sm">
-                    {coupon.expiry}
-                  </span>
+                <div className="flex items-center justify-between mt-auto">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase w-fit">
+                      -{coupon.type === 'percentage' ? `${coupon.discount}%` : `R$ ${coupon.discount}`} OFF
+                    </span>
+                    <span className="text-[8.5px] text-slate-300 font-bold mt-1">Válido para hoje</span>
+                  </div>
                   <button 
-                    onClick={() => onSelectCoupon(coupon)}
-                    className="bg-brand-blue text-white active:bg-brand-blue-hover text-[9.5px] font-black px-2.5 py-1 rounded-sm active:scale-95 transition-transform"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectCoupon(coupon);
+                    }}
+                    className="bg-slate-900 hover:bg-black text-white active:bg-brand-blue-hover text-[10px] font-black px-4 py-2 rounded-lg uppercase active:scale-95 transition-all shadow-sm"
                   >
-                    RESGATAR
+                    COPIAR
                   </button>
                 </div>
               </div>
             </div>
           ))}
+          </>
+          )}
         </div>
       </section>
-    ), storeSettings?.homeShowCoupons ?? true),
+    ), true),
 
     products: wrapSection('products', (
       <section className="mt-2 text-gray-800" id="discover-feed">
@@ -217,7 +268,11 @@ export default function HomeView({
           </div>
         )}
 
-        {displayedProducts.length === 0 ? (
+        {loading ? (
+          <div className="grid grid-cols-2 gap-3 p-3">
+            {[...Array(6)].map((_, i) => <ProductCardSkeleton key={i} />)}
+          </div>
+        ) : displayedProducts.length === 0 ? (
           <div className="py-16 text-center px-4">
             <p className="text-lg text-gray-450 font-bold mb-1">Infelizmente nada foi encontrado</p>
           </div>

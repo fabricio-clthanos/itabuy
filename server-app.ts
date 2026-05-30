@@ -192,4 +192,70 @@ async function updateOrderStatusByMPResponse(orderId: string, paymentDetails: an
   return 'not_found';
 }
 
+// AI Generation Endpoint
+serverApp.post('/api/ai/generate', async (req, res) => {
+  const { type, context } = req.body;
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    return res.status(500).json({ error: 'Gemini API key not configured' });
+  }
+
+  try {
+    const genAiModule: any = await import('@google/genai');
+    // In @google/genai, GoogleGenAI is a named export.
+    // In some environments, it might be nested in .default
+    const GoogleGenAI = genAiModule.GoogleGenAI || genAiModule.default?.GoogleGenAI;
+    
+    if (!GoogleGenAI) {
+      console.error('Imported module keys:', Object.keys(genAiModule));
+      throw new Error('Could not find GoogleGenAI constructor in module @google/genai');
+    }
+
+    const ai = new GoogleGenAI({
+      apiKey: apiKey,
+    });
+
+    let prompt = '';
+    switch (type) {
+      case 'gerar':
+        prompt = `Gere uma dica rápida ou um conselho útil relacionado a: ${context || 'e-commerce e compras inteligentes'}. Responda em apenas uma frase curta e impactante.`;
+        break;
+      case 'desafio':
+        prompt = `Gere um pequeno desafio ou missão divertida para o usuário fazer hoje na loja ItaBuy. Exemplo: 'Encontre 3 produtos azuis'. Seja criativo. Responda em apenas uma frase curta.`;
+        break;
+      case 'curiosidade':
+        prompt = `Gere uma curiosidade rápida e interessante sobre ${context || 'compras, tecnologia ou marcas famosas'}. Responda em apenas uma frase curta e interessante.`;
+        break;
+      case 'capsula':
+        prompt = `Você é uma cápsula do tempo da ItaBuy. Gere uma mensagem surpresa inspiradora ou uma previsão divertida sobre o futuro das compras para o usuário. Responda em apenas uma frase curta e mágica.`;
+        break;
+      default:
+        prompt = 'Diga oi de um jeito amigável em uma frase curta.';
+    }
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: prompt,
+    });
+    
+    const text = response.text || (typeof response.text === 'function' ? (response as any).text() : 'Pronto!');
+    res.json({ result: text.trim() });
+  } catch (error: any) {
+    console.error('Gemini AI Error:', error);
+    
+    // Friendly response for quota issues
+    const isQuotaError = error.status === 429 || 
+                        error.message?.includes('RESOURCE_EXHAUSTED') || 
+                        error.message?.includes('quota');
+                        
+    if (isQuotaError) {
+      return res.json({ result: 'Opa! Muita gente pedindo dicas agora. Tente novamente daqui a pouco!' });
+    }
+
+    res.status(500).json({ error: 'Falha ao processar requisição de IA' });
+  }
+});
+
 export { serverApp };
+

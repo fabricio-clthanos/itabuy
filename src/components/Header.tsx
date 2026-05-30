@@ -180,7 +180,7 @@ export default function Header({
                       >
                         <Search className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                         <span className="truncate flex-1">{item.name}</span>
-                        <span className="text-[10px] text-emerald-600 font-extrabold flex-shrink-0">R$ {item.price.toFixed(2)}</span>
+                        <span className="text-[10px] text-emerald-600 font-extrabold flex-shrink-0">R$ {(item.price || 0).toFixed(2)}</span>
                       </div>
                     ))}
                   </motion.div>

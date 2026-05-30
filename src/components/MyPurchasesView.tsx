@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Package, ArrowLeft, Info, MapPin, Truck, Check } from 'lucide-react';
+import { Package, ArrowLeft, Info, MapPin, Truck, Check, AlertTriangle, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 
 interface OrderItem {
   product: {
@@ -19,6 +20,7 @@ interface Order {
   itemsCount: number;
   status: string;
   cancellationRequested?: boolean;
+  cancellationStatus?: string;
   qr_code?: string;
   qr_code_base64?: string;
   address?: any;
@@ -38,6 +40,7 @@ interface MyPurchasesViewProps {
 
 const getStatusIndex = (status: string) => {
   if (status === 'Pendente' || status === 'Aguardando Pagamento') return 1;
+  if (status === 'Análise de Cancelamento') return -2;
   if (status === 'Processamento') return 2;
   if (status === 'Pedido sendo empacotado') return 3;
   if (status === 'Pedido saindo para entrega') return 4;
@@ -58,6 +61,16 @@ export default function MyPurchasesView({
 
   const toggleExpand = (id: string) => {
     setExpandedOrders(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!orderToCancel) return;
+    try {
+      await onCancelOrder(orderToCancel);
+      setOrderToCancel(null);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   return (
@@ -89,10 +102,12 @@ export default function MyPurchasesView({
                   <div>
                     <span className="text-[9.5px] text-gray-400 uppercase font-black tracking-wide">Pedido #{order.id}</span>
                     <h3 className="text-xs font-black text-gray-900">
-                        {order.items && order.items.length > 0 ? order.items[0].product.name : 'Vários itens'} - R$ {order.total.toFixed(2)}
+                        {order.items && order.items.length > 0 ? order.items[0].product.name : 'Vários itens'} - R$ {(order.total || 0).toFixed(2)}
                     </h3>
                   </div>
-                  <span className="text-xs text-brand-blue font-bold px-2 py-1 bg-blue-50 rounded-lg">{isExpanded ? 'Ver menos' : 'Ver mais'}</span>
+                  <span className={`text-xs font-bold px-2 py-1 rounded-lg ${order.status === 'Análise de Cancelamento' ? 'bg-amber-100 text-amber-600' : 'bg-blue-50 text-brand-blue'}`}>
+                    {order.status === 'Análise de Cancelamento' ? 'Em análise' : (isExpanded ? 'Ver menos' : 'Ver mais')}
+                  </span>
                 </div>
                 
                 {isExpanded && (
@@ -101,30 +116,59 @@ export default function MyPurchasesView({
                         <div><span className="text-[9px] text-gray-400 font-extrabold uppercase">Data:</span><div className="font-bold">{order.date}</div></div>
                         <div><span className="text-[9px] text-gray-400 font-extrabold uppercase">Pagamento:</span><div className="font-bold">{order.paymentMethod?.toUpperCase()}</div></div>
                     </div>
-                    <div className="py-2">
-                        <div className="flex justify-between items-center mb-1">
-                            {['Pendente', 'Proc.', 'Empac.', 'Envio', 'Entr.'].map((s, i) => (
-                                <div key={i} className="flex flex-col items-center flex-1">
-                                    <div className={`w-4 h-4 rounded-full flex items-center justify-center ${i < statusIdx ? 'bg-brand-blue' : 'bg-gray-200'} ${i === statusIdx - 1 ? 'ring-2 ring-blue-200' : ''}`}>
-                                        {i < statusIdx && <Check className="w-2.5 h-2.5 text-white" />}
-                                    </div>
-                                    <span className="text-[7px] mt-1 font-bold text-gray-400 uppercase">{s}</span>
-                                </div>
-                            ))}
+                    {order.status !== 'Análise de Cancelamento' && order.status !== 'Cancelado' && (
+                      <div className="py-2">
+                          <div className="flex justify-between items-center mb-1">
+                              {['Pendente', 'Proc.', 'Empac.', 'Envio', 'Entr.'].map((s, i) => (
+                                  <div key={i} className="flex flex-col items-center flex-1">
+                                      <div className={`w-4 h-4 rounded-full flex items-center justify-center ${i < statusIdx ? 'bg-brand-blue' : 'bg-gray-200'} ${i === statusIdx - 1 ? 'ring-2 ring-blue-200' : ''}`}>
+                                          {i < statusIdx && <Check className="w-2.5 h-2.5 text-white" />}
+                                      </div>
+                                      <span className="text-[7px] mt-1 font-bold text-gray-400 uppercase">{s}</span>
+                                  </div>
+                              ))}
+                          </div>
+                      </div>
+                    )}
+                    
+                    {order.status === 'Análise de Cancelamento' && (
+                      <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex items-center gap-3">
+                        <AlertTriangle className="w-5 h-5 text-amber-500" />
+                        <div>
+                          <p className="text-[10px] font-black text-amber-800 uppercase">Em Análise de Cancelamento</p>
+                          <p className="text-[9px] text-amber-600 font-bold">O administrador está revisando sua solicitação.</p>
                         </div>
-                    </div>
+                      </div>
+                    )}
+
+                    {order.status === 'Cancelado' && (
+                      <div className="bg-rose-50 border border-rose-200 p-3 rounded-xl flex items-center gap-3">
+                        <AlertTriangle className="w-5 h-5 text-rose-500" />
+                        <div>
+                          <p className="text-[10px] font-black text-rose-800 uppercase tracking-widest">Pedido Cancelado</p>
+                          <p className="text-[9px] text-rose-600 font-bold">O valor foi estornado ou a compra foi anulada.</p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Items */}
                     {order.items?.map((item, idx) => (
                       <div key={idx} className="flex gap-2 items-center bg-gray-50 p-2 rounded-xl text-xs">
                         <img src={item.product.images?.[0]} className="w-10 h-10 object-cover rounded-lg" />
                         <div className="flex-1">
                           <div className="font-black truncate">{item.product.name}</div>
-                          <div className="text-gray-500">Qtd: {item.quantity} - R$ {item.product.price.toFixed(2)}</div>
+                          <div className="text-gray-500">Qtd: {item.quantity} - R$ {(item.product.price || 0).toFixed(2)}</div>
                         </div>
                       </div>
                     ))}
                     <div className="pt-2">
-                        <button onClick={() => setOrderToCancel(order)} className="w-full py-2 bg-rose-50 text-rose-600 font-bold rounded-lg text-xs">Solicitar Cancelamento</button>
+                        <button 
+                          onClick={() => setOrderToCancel(order)}
+                          disabled={order.cancellationRequested || order.status === 'Cancelado' || order.status === 'Pedido entregue'}
+                          className={`w-full py-2 font-bold rounded-lg text-xs ${order.cancellationRequested || order.status === 'Cancelado' || order.status === 'Pedido entregue' ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-rose-50 text-rose-600 active:scale-95 transition-transform'}`}
+                        >
+                          {order.cancellationRequested ? 'Cancelamento Solicitado' : order.status === 'Cancelado' ? 'Pedido Cancelado' : 'Solicitar Cancelamento'}
+                        </button>
                     </div>
                   </div>
                 )}
@@ -133,6 +177,54 @@ export default function MyPurchasesView({
           })
         )}
       </div>
+
+      {/* Custom Confirmation Modal */}
+      <AnimatePresence>
+        {orderToCancel && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="bg-white w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl relative"
+            >
+              <button 
+                onClick={() => setOrderToCancel(null)}
+                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1 bg-gray-100 rounded-full"
+              >
+                <X size={16} />
+              </button>
+
+              <div className="p-6">
+                <div className="w-14 h-14 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-rose-100 shadow-inner">
+                  <AlertTriangle size={28} />
+                </div>
+                
+                <h3 className="text-sm font-black text-gray-900 text-center uppercase tracking-widest mb-2">Solicitar Cancelamento?</h3>
+                <p className="text-[11px] text-gray-500 text-center font-bold px-4 leading-relaxed mb-6">
+                  Deseja realmente solicitar o cancelamento do pedido <span className="text-gray-900 font-extrabold">#{orderToCancel.id}</span>? 
+                  Esta ação passará por análise administrativa.
+                </p>
+
+                <div className="space-y-2.5">
+                  <button 
+                    onClick={handleConfirmCancel}
+                    className="w-full py-3 bg-brand-blue text-white rounded-xl text-xs font-black uppercase tracking-widest active:scale-[0.98] transition-all shadow-md"
+                  >
+                    Confirmar Solicitação
+                  </button>
+                  <button 
+                    onClick={() => setOrderToCancel(null)}
+                    className="w-full py-3 bg-gray-100 text-gray-600 rounded-xl text-xs font-black uppercase tracking-widest active:scale-[0.98] transition-all"
+                  >
+                    Não, Manter Pedido
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

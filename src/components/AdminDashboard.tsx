@@ -9,15 +9,17 @@ import {
   Copy, Printer, CheckCircle2, LayoutDashboard, 
   ImageIcon, Settings, Upload, Music,
   MapPin, CreditCard, User, Clock, Timer, ShieldAlert,
-  RefreshCw, Trash2, Menu, MonitorPlay
+  RefreshCw, Trash2, Menu, MonitorPlay, FileCode
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import BannersAdminView from './BannersAdminView';
+import PagesAdminView from './PagesAdminView';
 import { Product, Coupon } from '../types';
 
 // --- MAIN ADMIN DASHBOARD ---
 
 export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'pedidos' | 'products' | 'categorias' | 'coupons' | 'settings' | 'cancelamentos'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'pedidos' | 'products' | 'categorias' | 'banners' | 'pages' | 'coupons' | 'settings' | 'cancelamentos'>('dashboard');
   const [audioUnlocked, setAudioUnlocked] = useState(() => {
     return localStorage.getItem('admin_notifications_unlocked_once') === 'true';
   });
@@ -122,6 +124,20 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             collapsed={sidebarCollapsed}
           />
           <SidebarButton 
+            active={activeTab === 'banners'} 
+            onClick={() => setActiveTab('banners')} 
+            icon={<ImageIcon size={18} />} 
+            label="Banners" 
+            collapsed={sidebarCollapsed}
+          />
+          <SidebarButton 
+            active={activeTab === 'pages'} 
+            onClick={() => setActiveTab('pages')} 
+            icon={<FileCode size={18} />} 
+            label="Páginas" 
+            collapsed={sidebarCollapsed}
+          />
+          <SidebarButton 
             active={activeTab === 'coupons'} 
             onClick={() => setActiveTab('coupons')} 
             icon={<Ticket size={18} />} 
@@ -200,6 +216,8 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             {activeTab === 'pedidos' && <PedidosAdminView audioUnlocked={audioUnlocked} />}
             {activeTab === 'cancelamentos' && <CancelamentosAdminView />}
             {activeTab === 'products' && <ProductsAdminTab />}
+            {activeTab === 'banners' && <BannersAdminView />}
+            {activeTab === 'pages' && <PagesAdminView />}
             {activeTab === 'coupons' && <CouponsAdminView />}
             {activeTab === 'categorias' && <CategoriasAdminView />}
             {activeTab === 'settings' && <SettingsAdminView onBack={() => setActiveTab('dashboard')} onTestSound={playTestSound} />}
@@ -241,23 +259,18 @@ function CategoriasAdminView() {
 
   const saveCategoriesList = async (updatedList: typeof categories) => {
     try {
-      await updateDoc(doc(db, 'settings', 'elementor'), {
+      await setDoc(doc(db, 'settings', 'elementor'), {
         categories: updatedList
-      });
+      }, { merge: true });
     } catch (err) {
       console.error('Error saving categories:', err);
-      try {
-        await setDoc(doc(db, 'settings', 'elementor'), { categories: updatedList }, { merge: true });
-      } catch (err2) {
-        console.error('Error fallback saving categories:', err2);
-      }
     }
   };
 
   const handleCreateCategory = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCatName.trim()) return;
-    const computedId = newCatId.trim().toLowerCase().replace(/\s+/g, '-') || newCatName.trim().toLowerCase().replace(/\s+/g, '-');
+    const computedId = (newCatId || '').trim().toLowerCase().replace(/\s+/g, '-') || (newCatName || '').trim().toLowerCase().replace(/\s+/g, '-');
     
     if (categories.some(c => c.id === computedId)) {
       alert('Já existe uma categoria com este ID!');
@@ -539,13 +552,13 @@ function DashboardOverviewView() {
     if (filterStatus !== 'all') {
       result = result.filter(o => o.status === filterStatus);
     }
-    if (filterMethod !== 'all') {
+    if (filterMethod && filterMethod !== 'all') {
       result = result.filter(o => (o.paymentMethod || 'pix').toLowerCase() === filterMethod.toLowerCase());
     }
     if (searchTerm) {
       const low = searchTerm.toLowerCase();
       result = result.filter(o => 
-        o.id?.toLowerCase().includes(low) || 
+        (o.id || '').toLowerCase().includes(low) || 
         (o.address?.fullname || o.clientName || '').toLowerCase().includes(low)
       );
     }
@@ -720,6 +733,7 @@ function StatCard({ label, value, color, icon }: { label: string, value: string,
 
 const STATUS_OPTIONS = [
   'Pendente',
+  'Análise de Cancelamento',
   'Processamento',
   'Pedido sendo empacotado',
   'Pedido saindo para entrega',
@@ -834,10 +848,10 @@ function PedidosAdminView({ audioUnlocked }: { audioUnlocked: boolean }) {
   const handleApproveFromAlert = async (orderId: string) => {
     try {
       const orderRef = doc(db, 'orders', orderId);
-      await updateDoc(orderRef, { 
+      await setDoc(orderRef, { 
         status: 'Processamento', 
         isAdminSeen: true 
-      });
+      }, { merge: true });
     } catch (err) {
       console.error("Error approving order:", err);
     }
@@ -849,7 +863,7 @@ function PedidosAdminView({ audioUnlocked }: { audioUnlocked: boolean }) {
       if (newStatus === 'Pedido entregue') {
         updateData.finishedAt = Date.now();
       }
-      await updateDoc(doc(db, 'orders', orderId), updateData);
+      await setDoc(doc(db, 'orders', orderId), updateData, { merge: true });
     } catch (err) {
       console.error("Error updating status:", err);
     }
@@ -1286,6 +1300,7 @@ function CancelamentosAdminView() {
   const [requests, setRequests] = useState<any[]>([]);
   const [filter, setFilter] = useState<'Pendentes' | 'Aprovados' | 'Todos'>('Pendentes');
   const [loading, setLoading] = useState(true);
+  const [actionStatus, setActionStatus] = useState<{id: string, type: 'approving' | 'rejecting'} | null>(null);
 
   useEffect(() => {
     // Listen in real-time to the cancellations collection
@@ -1306,52 +1321,45 @@ function CancelamentosAdminView() {
   }, []);
 
   const handleApprove = async (req: any) => {
-    if (!window.confirm(`Deseja aprovar o cancelamento do pedido #${req.orderId}? Isso mudará o status final do pedido para 'Cancelado'.`)) {
-      return;
-    }
-
     try {
       // 1. Update in cancellations collection
-      await updateDoc(doc(db, 'cancellations', req.id), {
+      await setDoc(doc(db, 'cancellations', String(req.id)), {
         status: 'Aprovado',
         approvedAt: Date.now()
-      });
+      }, { merge: true });
 
       // 2. Update order status to 'Cancelado'
-      await updateDoc(doc(db, 'orders', req.orderId), {
+      await setDoc(doc(db, 'orders', String(req.orderId)), {
         status: 'Cancelado',
         cancellationStatus: 'Aprovado'
-      });
-
-      window.alert(`Cancelamento do pedido #${req.orderId} aprovado e status do pedido atualizado para 'Cancelado'.`);
+      }, { merge: true });
+      
+      setActionStatus(null);
     } catch (err: any) {
       console.error(err);
-      window.alert('Erro ao aprovar cancelamento: ' + err.message);
+      alert('Erro ao aprovar cancelamento: ' + err.message);
     }
   };
 
   const handleReject = async (req: any) => {
-    if (!window.confirm(`Deseja REJEITAR a solicitação de cancelamento para o pedido #${req.orderId}?`)) {
-      return;
-    }
-
     try {
       // 1. Update status in cancellations
-      await updateDoc(doc(db, 'cancellations', req.id), {
+      await setDoc(doc(db, 'cancellations', String(req.id)), {
         status: 'Rejeitado',
         rejectedAt: Date.now()
-      });
+      }, { merge: true });
 
       // 2. Revert order status flag
-      await updateDoc(doc(db, 'orders', req.orderId), {
+      await setDoc(doc(db, 'orders', String(req.orderId)), {
+        status: 'Pendente', 
         cancellationRequested: false,
         cancellationStatus: 'Rejeitado'
-      });
-
-      window.alert(`Solicitação #${req.orderId} rejeitada com sucesso.`);
+      }, { merge: true });
+      
+      setActionStatus(null);
     } catch (err: any) {
       console.error(err);
-      window.alert('Erro ao rejeitar: ' + err.message);
+      alert('Erro ao rejeitar: ' + err.message);
     }
   };
 
@@ -1459,18 +1467,40 @@ function CancelamentosAdminView() {
 
                 {req.status === 'Pendente' && (
                   <div className="flex flex-col gap-2 shrink-0">
-                    <button
-                      onClick={() => handleApprove(req)}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10.5px] font-bold transition active:scale-95 uppercase tracking-wide cursor-pointer"
-                    >
-                      Aprovar & Estornar
-                    </button>
-                    <button
-                      onClick={() => handleReject(req)}
-                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10.5px] font-bold transition active:scale-95 uppercase tracking-wide cursor-pointer"
-                    >
-                      Rejeitar
-                    </button>
+                    {actionStatus?.id === req.id ? (
+                      <div className="flex flex-col gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
+                        <p className="text-[9px] font-bold text-slate-500 uppercase text-center mb-1">Confirmar {actionStatus.type === 'approving' ? 'Aprovação' : 'Rejeição'}?</p>
+                        <div className="flex gap-2">
+                           <button
+                             onClick={() => actionStatus.type === 'approving' ? handleApprove(req) : handleReject(req)}
+                             className={`px-3 py-1.5 ${actionStatus.type === 'approving' ? 'bg-emerald-600' : 'bg-rose-600'} text-white rounded-lg text-[10px] font-bold uppercase transition active:scale-95`}
+                           >
+                             Confirmar
+                           </button>
+                           <button
+                             onClick={() => setActionStatus(null)}
+                             className="px-3 py-1.5 bg-slate-200 text-slate-600 rounded-lg text-[10px] font-bold uppercase transition active:scale-95"
+                           >
+                             X
+                           </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => setActionStatus({ id: req.id, type: 'approving' })}
+                          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10.5px] font-bold transition active:scale-95 uppercase tracking-wide cursor-pointer"
+                        >
+                          Aprovar & Estornar
+                        </button>
+                        <button
+                          onClick={() => setActionStatus({ id: req.id, type: 'rejecting' })}
+                          className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[10.5px] font-bold transition active:scale-95 uppercase tracking-wide cursor-pointer"
+                        >
+                          Rejeitar
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -1669,10 +1699,13 @@ function ProductsAdminTab() {
     }
   };
 
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (p.category && p.category.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredProducts = products.filter(p => {
+    const lowSearch = (searchTerm || '').toLowerCase();
+    const name = p.name || '';
+    const category = p.category || '';
+    return name.toLowerCase().includes(lowSearch) || 
+           category.toLowerCase().includes(lowSearch);
+  });
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -1743,7 +1776,7 @@ function ProductsAdminTab() {
                       R$ {prod.price ? prod.price.toFixed(2) : '0,00'}
                       {prod.originalPrice && (
                         <span className="text-[10px] text-slate-400 line-through block font-normal">
-                          R$ {prod.originalPrice.toFixed(2)}
+                          R$ {(prod.originalPrice || 0).toFixed(2)}
                         </span>
                       )}
                     </td>
@@ -2166,7 +2199,7 @@ function CouponsAdminView() {
                   <div>
                     <span className="text-xs font-black text-slate-800 block">{coup.title}</span>
                     <span className="text-[9px] text-slate-405 font-bold block uppercase mt-0.5">
-                      Desconto: {coup.type === 'percentage' ? `${coup.discount}%` : `R$ ${coup.discount.toFixed(2)}`} | Mínimo: R$ {coup.minSpent ? coup.minSpent.toFixed(2) : '0,00'} | Expira: {coup.expiry}
+                      Desconto: {coup.type === 'percentage' ? `${coup.discount}%` : `R$ ${(coup.discount || 0).toFixed(2)}`} | Mínimo: R$ {coup.minSpent ? (coup.minSpent || 0).toFixed(2) : '0,00'} | Expira: {coup.expiry}
                     </span>
                   </div>
                 </div>

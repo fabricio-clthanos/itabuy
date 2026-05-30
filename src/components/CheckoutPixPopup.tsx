@@ -105,7 +105,7 @@ export default function CheckoutPixPopup({ orderId, total, pixData, onSuccess, o
           {/* Compact Total Card */}
           <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 flex justify-between items-center mb-4 text-sm select-none font-sans">
             <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider">Valor total à pagar:</span>
-            <span className="text-base font-black text-slate-900">R$ {total.toFixed(2)}</span>
+            <span className="text-base font-black text-slate-900">R$ {(total || 0).toFixed(2)}</span>
           </div>
 
           {status === 'confirmed' ? (

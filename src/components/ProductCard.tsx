@@ -130,11 +130,11 @@ export default function ProductCard({ product, onClick }: ProductCardProps) {
           <div className="flex flex-col">
             <div className="flex items-baseline gap-1.5 flex-wrap">
               <span className="text-sm font-semibold text-gray-900">
-                R$ {product.price.toFixed(2)}
+                R$ {(product.price || 0).toFixed(2)}
               </span>
               {product.originalPrice && (
                 <span className="text-[10px] text-gray-400 line-through font-normal">
-                  R$ {product.originalPrice.toFixed(2)}
+                  R$ {(product.originalPrice || 0).toFixed(2)}
                 </span>
               )}
             </div>

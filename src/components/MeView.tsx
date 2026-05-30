@@ -301,7 +301,7 @@ export default function MeView({
                       </div>
                       <div>
                         <span className="text-[9px] text-gray-400 font-extrabold uppercase block mb-0.5">Valor Total Pago</span>
-                        <span className="font-black text-brand-blue">R$ {order.total.toFixed(2)}</span>
+                        <span className="font-black text-brand-blue">R$ {(order.total || 0).toFixed(2)}</span>
                       </div>
                     </div>
 
@@ -326,7 +326,7 @@ export default function MeView({
                                 )}
                               </div>
                               <div className="text-right shrink-0">
-                                <span className="text-[11px] font-black text-gray-800 block animate-fade-in">R$ {item.product.price.toFixed(2)}</span>
+                                <span className="text-[11px] font-black text-gray-800 block animate-fade-in">R$ {(item.product.price || 0).toFixed(2)}</span>
                                 <span className="text-[9.5px] text-gray-400 font-bold block">Qtd: {item.quantity}</span>
                               </div>
                             </div>
@@ -901,7 +901,7 @@ export default function MeView({
                   {prod.name}
                 </h4>
                 <div className="text-[11px] font-extrabold text-brand-blue mt-0.5">
-                  R$ {prod.price.toFixed(2)}
+                  R$ {(prod.price || 0).toFixed(2)}
                 </div>
               </div>
             ))}

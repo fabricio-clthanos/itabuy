@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { Trash2, MapPin, CreditCard, Ticket, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Trash2, MapPin, CreditCard, Ticket, Loader2, ShoppingBag } from 'lucide-react';
 import { CartItem, Coupon, Product } from '../types';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface CartViewProps {
   cartItems: CartItem[];
@@ -28,6 +29,41 @@ interface CartViewProps {
   onSelectProduct?: (product: Product) => void;
 }
 
+function TypingHeader({ onComplete }: { onComplete: () => void }) {
+  const text = "carrinho →";
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onComplete();
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [onComplete]);
+
+  return (
+    <motion.div
+      key="typing-internal"
+      initial={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 1.5, ease: "easeInOut" }}
+      className="flex items-center justify-center pointer-events-none"
+    >
+      <div className="flex">
+        {text.split('').map((char, index) => (
+          <motion.span
+            key={index}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: index * 0.1, duration: 0.1 }}
+            className="text-brand-blue font-black text-2xl uppercase tracking-[0.2em]"
+          >
+            {char === ' ' ? '\u00A0' : char}
+          </motion.span>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
 export default function CartView({
   cartItems,
   onUpdateQuantity,
@@ -38,6 +74,8 @@ export default function CartView({
   onCheckout,
   isCheckingOut = false
 }: CartViewProps) {
+  const [showTyping, setShowTyping] = useState(true);
+  
   // Coupon state applied
   const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null);
 
@@ -51,12 +89,12 @@ export default function CartView({
   const [changeAmount, setChangeAmount] = useState('');
 
   // Persist address fields whenever they change
-  useState(() => {
+  useEffect(() => {
     localStorage.setItem('itabuy_addr_street', street);
     localStorage.setItem('itabuy_addr_number', number);
     localStorage.setItem('itabuy_addr_neighborhood', neighborhood);
     localStorage.setItem('itabuy_addr_reference', reference);
-  });
+  }, [street, number, neighborhood, reference]);
 
   // All selected count
   const allSelected = cartItems.length > 0 && cartItems.every((item) => item.selected);
@@ -107,17 +145,39 @@ export default function CartView({
   };
 
   return (
-    <div className="flex-grow bg-[#FAFAFA] min-h-screen pb-36 font-sans">
+    <div className="flex-grow bg-[#FAFAFA] min-h-screen pb-36 font-sans select-none">
       
-      {/* Centered Modern Header */}
-      <div className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 py-4 text-center sticky top-0 z-30 shadow-sm">
-        <h2 className="text-gray-900 font-bold text-sm tracking-wide">MEU CARRINHO</h2>
+      {/* Centered Modern Header - Larger and Animated */}
+      <div className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 h-32 sticky top-0 z-30 shadow-sm flex items-center justify-center overflow-hidden">
+        <AnimatePresence mode="wait">
+          {showTyping ? (
+            <TypingHeader onComplete={() => setShowTyping(false)} />
+          ) : (
+            <motion.div 
+              key="icon"
+              initial={{ scale: 0.5, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ 
+                type: "spring",
+                stiffness: 260,
+                damping: 20,
+                duration: 0.6 
+              }}
+              className="flex flex-col items-center"
+            >
+              <ShoppingBag className="w-14 h-14 text-brand-blue" />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {cartItems.length === 0 ? (
-        <div className="py-24 text-center px-6 flex flex-col items-center">
-          <span className="text-5xl border border-gray-100 rounded-full p-6 shadow-sm mb-4">🛍️</span>
-          <h2 className="text-gray-800 text-sm font-semibold tracking-wide">Seu carrinho está vazio</h2>
+        <div className="py-24 text-center px-6 flex flex-col items-center animate-in fade-in slide-in-from-bottom-5 duration-700">
+          <div className="w-24 h-24 bg-blue-50 rounded-full flex items-center justify-center mb-6 border border-blue-100 shadow-inner">
+             <ShoppingBag className="w-10 h-10 text-brand-blue opacity-40" />
+          </div>
+          <h2 className="text-gray-800 text-sm font-black uppercase tracking-widest px-8 py-2 border-b-2 border-brand-blue/10">Carrinho Vazio</h2>
+          <p className="mt-4 text-xs text-gray-400 font-medium">Volte para a loja e adicione produtos!</p>
         </div>
       ) : (
         <div className="p-3 space-y-4">
@@ -163,9 +223,14 @@ export default function CartView({
                   </div>
 
                   <div className="flex items-center justify-between w-full mt-auto">
-                    <span className="text-sm font-black text-brand-blue">
-                      R$ {(item.product.price || 0).toFixed(2)}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-black text-brand-blue">
+                        R$ {(item.product.price || 0).toFixed(2)}
+                      </span>
+                      <span className="text-[9px] font-bold text-emerald-600">
+                        Pix: R$ {((item.product.price || 0) * 0.9).toFixed(2)}
+                      </span>
+                    </div>
                     <div className="flex items-center border border-gray-200 rounded-lg bg-gray-50 shadow-sm">
                       <button onClick={() => onUpdateQuantity(item.id, item.quantity - 1)} className="px-3 py-1 font-black text-gray-500">-</button>
                       <span className="px-2 text-xs font-bold text-gray-800">{item.quantity}</span>
@@ -184,13 +249,44 @@ export default function CartView({
             ))}
           </div>
 
-          {/* Quick Select Coupons */}
-          {coupons.length > 0 && (
-            <div className="bg-white p-4 rounded-none border border-gray-100 shadow-sm space-y-3">
-              <div className="flex items-center gap-2 text-xs font-bold text-gray-800">
-                <Ticket className="w-4 h-4 text-brand-blue" />
-                <span>CUPOM DO PEDIDO</span>
-              </div>
+          {/* Quick Select Coupons & Manual Input */}
+          <div className="bg-white p-4 rounded-none border border-gray-100 shadow-sm space-y-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-gray-800">
+              <Ticket className="w-4 h-4 text-brand-blue" />
+              <span>CUPOM DE DESCONTO</span>
+            </div>
+            
+            {/* Manual Coupon Input */}
+            <div className="flex gap-2">
+              <input 
+                type="text" 
+                placeholder="Insira o código" 
+                className="flex-1 text-xs border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:border-brand-blue bg-gray-50"
+                id="manual-coupon-input"
+              />
+              <button 
+                onClick={() => {
+                  const input = document.getElementById('manual-coupon-input') as HTMLInputElement;
+                  const code = input?.value?.trim().toUpperCase();
+                  if (!code) return;
+                  const found = coupons.find(c => c.code.toUpperCase() === code);
+                  if (found) {
+                    if (itemsSubtotal >= found.minSpent) {
+                      setSelectedCoupon(found);
+                    } else {
+                      alert(`Este cupom requer gasto mínimo de R$ ${found.minSpent}`);
+                    }
+                  } else {
+                    alert('Cupom inválido ou expirado.');
+                  }
+                }}
+                className="bg-brand-blue text-white text-[10px] font-bold px-4 py-2 rounded-lg active:scale-95 transition-transform"
+              >
+                APLICAR
+              </button>
+            </div>
+
+            {coupons.length > 0 && (
               <div className="flex gap-2 overflow-x-auto pb-1 ios-scroll-inertia no-scrollbar">
                 {coupons.map((coupon) => {
                   const eligible = itemsSubtotal >= coupon.minSpent;
@@ -209,13 +305,13 @@ export default function CartView({
                             : 'bg-gray-50 border-gray-100 text-gray-400 opacity-60'
                       }`}
                     >
-                      {coupon.code} {eligible ? `(-R$ ${coupon.discount})` : `(Min: R$${coupon.minSpent})`}
+                      {coupon.code} {eligible ? `(-R$ ${(coupon.discount || 0).toFixed(2)})` : `(Min: R$${(coupon.minSpent || 0).toFixed(2)})`}
                     </button>
                   );
                 })}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* ADDRESS FIELD COMPACT */}
           <div className="bg-white p-4 rounded-none border border-gray-100 shadow-sm space-y-3">
@@ -300,15 +396,46 @@ export default function CartView({
             )}
           </div>
 
+          {/* RESUMO DO PEDIDO */}
+          <div className="bg-white p-4 border border-gray-100 shadow-sm space-y-3">
+            <h3 className="text-xs font-black text-gray-800 uppercase tracking-widest">Resumo do Pedido</h3>
+            <div className="space-y-2.5">
+              <div className="flex justify-between text-xs text-gray-600">
+                <span>Subtotal</span>
+                <span>R$ {(itemsSubtotal || 0).toFixed(2)}</span>
+              </div>
+              {couponDiscount > 0 && (
+                <div className="flex justify-between text-xs text-emerald-600 font-bold">
+                  <span>Cupom ({selectedCoupon?.code})</span>
+                  <span>- R$ {(couponDiscount || 0).toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-xs text-brand-blue font-bold">
+                <span>Frete</span>
+                <span className="uppercase">Grátis</span>
+              </div>
+              <div className="pt-2 border-t border-gray-100 flex justify-between font-black text-sm text-gray-900">
+                <span>Total</span>
+                <span>R$ {(orderTotal || 0).toFixed(2)}</span>
+              </div>
+              {paymentMethod === 'pix' && (
+                <div className="bg-emerald-50 text-emerald-700 p-2 rounded-lg text-[10px] font-bold flex justify-between">
+                  <span>Total com Desconto Pix (10%):</span>
+                  <span>R$ {((orderTotal || 0) * 0.9).toFixed(2)}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Bottom Summary Glass Bar */}
           <div className="fixed bottom-14 left-0 right-0 z-40 bg-white/80 backdrop-blur-md border-t border-gray-200/60 shadow-sm">
             <div className="mx-auto max-w-md h-[4.5rem] px-4 flex items-center justify-between">
               <div className="flex flex-col">
                 <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wide">Total</span>
                 <span className="text-brand-blue font-black text-[19px] leading-tight select-none">
-                  R$ {selectedItems.length > 0 ? orderTotal.toFixed(2) : '0,00'}
+                  R$ {selectedItems.length > 0 ? (orderTotal || 0).toFixed(2) : '0,00'}
                 </span>
-                {couponDiscount > 0 && <span className="text-[9px] text-emerald-600 font-bold tracking-wide">(-R${couponDiscount.toFixed(2)})</span>}
+                {couponDiscount > 0 && <span className="text-[9px] text-emerald-600 font-bold tracking-wide">(-R${(couponDiscount || 0).toFixed(2)})</span>}
               </div>
 
               <button

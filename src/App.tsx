@@ -10,13 +10,14 @@ import { Product, CartItem, Coupon } from './types';
 import Header from './components/Header';
 import HomeView from './components/HomeView';
 import ProductDetailView from './components/ProductDetailView';
+import CategoryView from './components/CategoryView';
+import BannerPageView from './components/BannerPageView';
 import SearchView from './components/SearchView';
 import CartView from './components/CartView';
 import MeView from './components/MeView';
 import MyPurchasesView from './components/MyPurchasesView';
 import SorteiosView from './components/SorteiosView';
 import FlashDealsView from './components/FlashDealsView';
-import CategoryView from './components/CategoryView';
 import AdminDashboard from './components/AdminDashboard';
 import OptionsPickerPopup from './components/OptionsPickerPopup';
 import CheckoutPixPopup from './components/CheckoutPixPopup';
@@ -88,6 +89,7 @@ export default function App() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [currentPageId, setCurrentPageId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Favorites State (Persisted in localStorage)
@@ -163,6 +165,9 @@ export default function App() {
   // Claimed Coupons list
   const [claimedCoupons, setClaimedCoupons] = useState<Coupon[]>([]);
 
+  // Banners for carousels
+  const [banners, setBanners] = useState<any[]>([]);
+
   // Orders Log History list populated from Firestore
   const [orderHistory, setOrderHistory] = useState<any[]>([]);
 
@@ -228,18 +233,21 @@ export default function App() {
       handleFirestoreError(error, OperationType.GET, 'products');
     });
 
-    // Listen to coupons live updates
+    // Listen to banners live updates
+    const unsubBanners = onSnapshot(doc(db, 'settings', 'banners'), (docSnap) => {
+      if (docSnap.exists() && docSnap.data().banners) {
+        setBanners(docSnap.data().banners);
+      }
+    });
+
     const unsubCoupons = onSnapshot(collection(db, 'coupons'), (snapshot) => {
       const coupList: Coupon[] = [];
       snapshot.forEach((doc) => {
         coupList.push({ id: doc.id, ...doc.data() } as Coupon);
       });
       setAvailableCoupons(coupList);
-    }, (error) => {
-      console.error("Firestore loading error for coupons:", error);
-      handleFirestoreError(error, OperationType.GET, 'coupons');
     });
-
+    
     // Live Elementor Settings from Firestore
     const unsubSettings = onSnapshot(doc(db, 'settings', 'elementor'), (docSnap) => {
       if (docSnap.exists()) {
@@ -249,8 +257,9 @@ export default function App() {
 
     return () => {
       unsubProducts();
-      unsubCoupons();
       unsubSettings();
+      unsubBanners();
+      unsubCoupons();
     };
   }, []);
 
@@ -778,6 +787,7 @@ export default function App() {
       // 2. We also flag the order itself with cancellationRequested: true
       const orderRef = doc(db, 'orders', order.id);
       await setDoc(orderRef, {
+        status: 'Análise de Cancelamento',
         cancellationRequested: true,
         cancellationStatus: 'Pendente'
       }, { merge: true });
@@ -787,7 +797,7 @@ export default function App() {
       await setDoc(notificationRef, {
         id: `cancel-${order.id}`,
         title: 'Nova Solicitação de Cancelamento',
-        message: `O cliente ${firebaseUser.displayName || mappedUser?.name || 'ItaBuy'} solicitou cancelamento do pedido #${order.id} (R$ ${order.total.toFixed(2)})`,
+        message: `O cliente ${firebaseUser.displayName || mappedUser?.name || 'ItaBuy'} solicitou cancelamento do pedido #${order.id} (R$ ${(order.total || 0).toFixed(2)})`,
         type: 'cancellation',
         orderId: order.id,
         timestamp: Date.now(),
@@ -810,6 +820,11 @@ export default function App() {
       setSelectedCategory(catId);
       setCurrentView('category');
     }
+  };
+
+  const handleNavigateToPage = (pId: string) => {
+    setCurrentPageId(pId);
+    setCurrentView('banner_page');
   };
 
   // Filter products strictly based on categories selection if any
@@ -919,7 +934,7 @@ export default function App() {
                   href="https://www.instagram.com/itabuy.com.br/" 
                   target="_blank" 
                   rel="noreferrer"
-                  className="block bg-gradient-to-r from-[#d6249f] via-[#fd5949] to-[#fccc63] text-white py-2 overflow-hidden select-none cursor-pointer border-b border-gray-100 shrink-0 shadow-sm"
+                  className="block bg-gradient-primary text-white py-2 overflow-hidden select-none cursor-pointer border-b border-gray-100 shrink-0 shadow-sm"
                 >
                   <div className="w-full overflow-hidden flex">
                     <div className="animate-marquee flex gap-12 text-[10px] font-black uppercase tracking-widest text-white whitespace-nowrap">
@@ -947,8 +962,11 @@ export default function App() {
                   onSelectCoupon={handleClaimCoupon}
                   searchQuery={searchQuery}
                   onNavigateToCategory={handleNavigateToCategory}
+                  onNavigateToPage={handleNavigateToPage}
                   onNavigateToFlashDeals={() => setCurrentView('flash_deals')}
                   availableCoupons={availableCoupons}
+                  banners={banners}
+                  loading={isLoadingDB}
                   storeSettings={storeSettings}
                   inspectMode={inspectMode}
                 />
@@ -1075,10 +1093,18 @@ export default function App() {
               />
             )}
 
+            {currentView === 'banner_page' && currentPageId && (
+              <BannerPageView
+                pageId={currentPageId}
+                onBack={() => setCurrentView('home')}
+              />
+            )}
+
             {currentView === 'category' && (
               <CategoryView 
                 categoryId={selectedCategory}
                 products={products}
+                loading={isLoadingDB}
                 onSelectProduct={(p) => {
                   setSelectedProduct(p);
                   setCurrentView('product');
@@ -1178,7 +1204,7 @@ export default function App() {
 
                   <div className="my-3 p-2.5 bg-slate-50 border border-slate-100 rounded-xl w-full text-center">
                     <span className="text-[10px] text-gray-400 block uppercase font-bold leading-none mb-1">Total a Pagar</span>
-                    <span className="text-brand-blue font-black text-lg">R$ {checkoutSuccessModal.total.toFixed(2)}</span>
+                    <span className="text-brand-blue font-black text-lg">R$ {(checkoutSuccessModal.total || 0).toFixed(2)}</span>
                   </div>
 
                   {/* Delivery Address display */}

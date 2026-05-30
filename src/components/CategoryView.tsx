@@ -2,19 +2,22 @@ import { ArrowLeft, Sparkles, AlertCircle } from 'lucide-react';
 import { Product } from '../types';
 import ProductCard from './ProductCard';
 import { CATEGORIES } from '../data/mockData';
+import { ProductCardSkeleton } from './Skeleton';
 
 interface CategoryViewProps {
   categoryId: string;
   products: Product[];
   onSelectProduct: (product: Product) => void;
   onBack: () => void;
+  loading?: boolean;
 }
 
 export default function CategoryView({
   categoryId,
   products,
   onSelectProduct,
-  onBack
+  onBack,
+  loading
 }: CategoryViewProps) {
   
   // Find category details
@@ -53,7 +56,11 @@ export default function CategoryView({
       {/* 2. Products List Container (strictly 2 columns) */}
       <div className="p-2.5">
         
-        {categoryProducts.length === 0 ? (
+        {loading ? (
+          <div className="grid grid-cols-2 gap-2 select-none">
+            {[...Array(6)].map((_, i) => <ProductCardSkeleton key={i} />)}
+          </div>
+        ) : categoryProducts.length === 0 ? (
           <div className="bg-white p-8 rounded-2xl border border-gray-150 text-center flex flex-col items-center justify-center my-6 shadow-2xs">
             <AlertCircle className="w-10 h-10 text-gray-300 mb-3" />
             <span className="text-gray-900 font-extrabold text-sm mb-1 uppercase tracking-wide">Sem Estoque Disponível</span>

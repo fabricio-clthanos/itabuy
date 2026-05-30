@@ -56,8 +56,8 @@ export default function SearchView({
     if (activeQuery.trim()) {
       const searchLower = activeQuery.toLowerCase().trim();
       result = result.filter(
-        p => p.name.toLowerCase().includes(searchLower) || 
-             p.category.toLowerCase().includes(searchLower) ||
+        p => (p.name || '').toLowerCase().includes(searchLower) || 
+             (p.category || '').toLowerCase().includes(searchLower) ||
              (p.description && p.description.toLowerCase().includes(searchLower))
       );
     }
@@ -340,13 +340,13 @@ export default function SearchView({
                   <div className="mt-2.5">
                     {product.originalPrice && (
                       <span className="text-[10px] text-gray-400 line-through block leading-none mb-0.5 font-normal">
-                        R$ {product.originalPrice.toFixed(2)}
+                        R$ {(product.originalPrice || 0).toFixed(2)}
                       </span>
                     )}
 
                     <div className="flex items-baseline gap-1.5 flex-wrap">
                       <span className="text-sm font-semibold text-gray-950 leading-none">
-                        R$ {product.price.toFixed(2)}
+                        R$ {(product.price || 0).toFixed(2)}
                       </span>
                       {product.freeShipping && (
                         <span className="text-[9px] text-emerald-600 font-extrabold tracking-wide uppercase">

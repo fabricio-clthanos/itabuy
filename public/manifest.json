@@ -1,0 +1,18 @@
+{
+  "name": "ItaBuy Store",
+  "short_name": "ItaBuy",
+  "description": "Sua loja de eletrônicos e variedades com entrega rápida.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0048ff",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/itabuy_app_icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
